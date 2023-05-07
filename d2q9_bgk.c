@@ -1,4 +1,6 @@
 #include "d2q9_bgk.h"
+#include "immintrin.h"
+#include <xmmintrin.h>
 
 /* The main processes in one step */
 int collision(const t_param params, t_speed *cells, t_speed *tmp_cells,
@@ -39,7 +41,11 @@ int collision(const t_param params, t_speed *cells, t_speed *tmp_cells,
   ** the collision step is called before
   ** the streaming step and so values of interest
   ** are in the scratch-space grid */
-
+  __m256 _1 = _mm256_set1_ps(1.f);
+  __m256 c = _mm256_set1_ps(c_sq);
+  __m256 _2_c_c = _mm256_set1_ps(2.f * c_sq * c_sq);
+  __m256 w = _mm256_setr_ps(w1, w1, w1, w1, w2, w2, w2, w2);
+  __m256 omega = _mm256_set1_ps(params.omega);
 #pragma omp parallel for
   for (int jj = 0; jj < params.ny; jj++) {
     for (int ii = 0; ii < params.nx; ii++) {
@@ -90,39 +96,62 @@ int collision(const t_param params, t_speed *cells, t_speed *tmp_cells,
         d_equ[0] = w0 * local_density *
                    (1.f + u[0] / c_sq + (u[0] * u[0]) / (2.f * c_sq * c_sq) -
                     u_sq / (2.f * c_sq));
+        __m256 x = _mm256_loadu_ps(u + 1);
+
+        __m256 l_d = _mm256_set1_ps(local_density);
+
+        __m256 u_2_c = _mm256_set1_ps(u_sq / (2.f * c_sq));
+        __m256 x_2 = _mm256_mul_ps(x, x);
+        x = _mm256_div_ps(x, c);
+        x_2 = _mm256_div_ps(x_2, _2_c_c);
+        __m256 res_1 = _mm256_add_ps(_1, x);
+        __m256 res_2 = _mm256_sub_ps(x_2, u_2_c);
+        __m256 res = _mm256_add_ps(res_1, res_2);
+        res = _mm256_mul_ps(res, l_d);
+
+        res = _mm256_mul_ps(res, w);
+        _mm256_storeu_ps(d_equ + 1, res);
         /* axis speeds: weight w1 */
-        d_equ[1] = w1 * local_density *
-                   (1.f + u[1] / c_sq + (u[1] * u[1]) / (2.f * c_sq * c_sq) -
-                    u_sq / (2.f * c_sq));
-        d_equ[2] = w1 * local_density *
-                   (1.f + u[2] / c_sq + (u[2] * u[2]) / (2.f * c_sq * c_sq) -
-                    u_sq / (2.f * c_sq));
-        d_equ[3] = w1 * local_density *
-                   (1.f + u[3] / c_sq + (u[3] * u[3]) / (2.f * c_sq * c_sq) -
-                    u_sq / (2.f * c_sq));
-        d_equ[4] = w1 * local_density *
-                   (1.f + u[4] / c_sq + (u[4] * u[4]) / (2.f * c_sq * c_sq) -
-                    u_sq / (2.f * c_sq));
-        /* diagonal speeds: weight w2 */
-        d_equ[5] = w2 * local_density *
-                   (1.f + u[5] / c_sq + (u[5] * u[5]) / (2.f * c_sq * c_sq) -
-                    u_sq / (2.f * c_sq));
-        d_equ[6] = w2 * local_density *
-                   (1.f + u[6] / c_sq + (u[6] * u[6]) / (2.f * c_sq * c_sq) -
-                    u_sq / (2.f * c_sq));
-        d_equ[7] = w2 * local_density *
-                   (1.f + u[7] / c_sq + (u[7] * u[7]) / (2.f * c_sq * c_sq) -
-                    u_sq / (2.f * c_sq));
-        d_equ[8] = w2 * local_density *
-                   (1.f + u[8] / c_sq + (u[8] * u[8]) / (2.f * c_sq * c_sq) -
-                    u_sq / (2.f * c_sq));
+        // d_equ[1] = w1 * local_density *
+        //            (1.f + u[1] / c_sq + (u[1] * u[1]) / (2.f * c_sq * c_sq) -
+        //             u_sq / (2.f * c_sq));
+        // d_equ[2] = w1 * local_density *
+        //            (1.f + u[2] / c_sq + (u[2] * u[2]) / (2.f * c_sq * c_sq) -
+        //             u_sq / (2.f * c_sq));
+        // d_equ[3] = w1 * local_density *
+        //            (1.f + u[3] / c_sq + (u[3] * u[3]) / (2.f * c_sq * c_sq) -
+        //             u_sq / (2.f * c_sq));
+        // d_equ[4] = w1 * local_density *
+        //            (1.f + u[4] / c_sq + (u[4] * u[4]) / (2.f * c_sq * c_sq) -
+        //             u_sq / (2.f * c_sq));
+        // /* diagonal speeds: weight w2 */
+        // d_equ[5] = w2 * local_density *
+        //            (1.f + u[5] / c_sq + (u[5] * u[5]) / (2.f * c_sq * c_sq) -
+        //             u_sq / (2.f * c_sq));
+        // d_equ[6] = w2 * local_density *
+        //            (1.f + u[6] / c_sq + (u[6] * u[6]) / (2.f * c_sq * c_sq) -
+        //             u_sq / (2.f * c_sq));
+        // d_equ[7] = w2 * local_density *
+        //            (1.f + u[7] / c_sq + (u[7] * u[7]) / (2.f * c_sq * c_sq) -
+        //             u_sq / (2.f * c_sq));
+        // d_equ[8] = w2 * local_density *
+        //            (1.f + u[8] / c_sq + (u[8] * u[8]) / (2.f * c_sq * c_sq) -
+        //             u_sq / (2.f * c_sq));
         /* relaxation step */
-        for (int kk = 0; kk < NSPEEDS; kk++) {
-          tmp_cells[ii + jj * params.nx].speeds[kk] =
-              cells[ii + jj * params.nx].speeds[kk] +
-              params.omega *
-                  (d_equ[kk] - cells[ii + jj * params.nx].speeds[kk]);
-        }
+        tmp_cells[ii + jj * params.nx].speeds[0] =
+            cells[ii + jj * params.nx].speeds[0] +
+            params.omega * (d_equ[0] - cells[ii + jj * params.nx].speeds[0]);
+        __m256 c_s = _mm256_loadu_ps(cells[ii + jj * params.nx].speeds + 1);
+        res = _mm256_sub_ps(res, c_s);
+        res = _mm256_mul_ps(res, omega);
+        res = _mm256_add_ps(res, c_s);
+        _mm256_storeu_ps(tmp_cells[ii + jj * params.nx].speeds + 1, res);
+        // for (int kk = 0; kk < NSPEEDS; kk++) {
+        //   tmp_cells[ii + jj * params.nx].speeds[kk] =
+        //       cells[ii + jj * params.nx].speeds[kk] +
+        //       params.omega *
+        //           (d_equ[kk] - cells[ii + jj * params.nx].speeds[kk]);
+        // }
       }
     }
   }
