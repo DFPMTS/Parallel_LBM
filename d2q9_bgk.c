@@ -239,7 +239,7 @@ int streaming(int start_col, int end_col, const t_param params, t_speed *cells,
 
 #pragma omp parallel for
   for (int jj = 0; jj < params.ny; jj++) {
-    for (int ii = end_col - 1; ii >= start_col; ii--) {
+    for (int ii = start_col; ii < end_col; ii++) {
       /* determine indices of axis-direction neighbours
       ** respecting periodic boundary conditions (wrap around) */
       int y_n = (jj + 1) % params.ny;
