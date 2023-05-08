@@ -20,7 +20,7 @@ int boundary(const t_param params, t_speed *cells, t_speed *tmp_cells,
 int timestep(const t_param params, t_speed *cells, t_speed *tmp_cells,
              float *inlets, int *obstacles) {
   /* The main time overhead, you should mainly optimize these processes. */
-  int col_per_time = 120, start, end, last_end = 0;
+  int col_per_time = 260, start, end, last_end = 0;
   collision(params.nx - 1, params.nx, params, cells, tmp_cells, obstacles);
   // printf("collision(%d, %d)\n", params.ny - 1, params.ny);
   for (int i = 0; i < params.nx - 1; i += col_per_time) {
