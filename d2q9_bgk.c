@@ -20,7 +20,7 @@ int boundary(const t_param params, t_speed *cells, t_speed *tmp_cells,
 int timestep(const t_param params, t_speed *cells, t_speed *tmp_cells,
              float *inlets, int *obstacles) {
   /* The main time overhead, you should mainly optimize these processes. */
-  int col_per_time = 120, start, end, last_end = 0;
+  int col_per_time = 60, start, end, last_end = 0;
   collision(params.nx - 1, params.nx, params, cells, tmp_cells, obstacles);
   // printf("collision(%d, %d)\n", params.ny - 1, params.ny);
   for (int i = 0; i < params.nx - 1; i += col_per_time) {
@@ -239,7 +239,7 @@ int streaming(int start_col, int end_col, const t_param params, t_speed *cells,
 
 #pragma omp parallel for
   for (int jj = 0; jj < params.ny; jj++) {
-    for (int ii = start_col; ii < end_col; ii++) {
+    for (int ii = end_col - 1; ii >= start_col; ii--) {
       /* determine indices of axis-direction neighbours
       ** respecting periodic boundary conditions (wrap around) */
       int y_n = (jj + 1) % params.ny;
