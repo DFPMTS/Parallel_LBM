@@ -3,9 +3,10 @@
 #include <xmmintrin.h>
 
 /* The main processes in one step */
-int collision(const t_param params, t_speed *cells, t_speed *tmp_cells,
-              int *obstacles);
-int streaming(const t_param params, t_speed *cells, t_speed *tmp_cells);
+int collision(int start_col, int end_col, const t_param params, t_speed *cells,
+              t_speed *tmp_cells, int *obstacles);
+int streaming(int start_col, int end_col, const t_param params, t_speed *cells,
+              t_speed *tmp_cells);
 int obstacle(const t_param params, t_speed *cells, t_speed *tmp_cells,
              int *obstacles);
 int boundary(const t_param params, t_speed *cells, t_speed *tmp_cells,
@@ -19,10 +20,23 @@ int boundary(const t_param params, t_speed *cells, t_speed *tmp_cells,
 int timestep(const t_param params, t_speed *cells, t_speed *tmp_cells,
              float *inlets, int *obstacles) {
   /* The main time overhead, you should mainly optimize these processes. */
-  collision(params, cells, tmp_cells, obstacles);
-  obstacle(params, cells, tmp_cells, obstacles);
-  streaming(params, cells, tmp_cells);
+  int col_per_time = 120, start, end, last_end = 0;
+  collision(params.nx - 1, params.nx, params, cells, tmp_cells, obstacles);
+  // printf("collision(%d, %d)\n", params.ny - 1, params.ny);
+  for (int i = 0; i < params.nx - 1; i += col_per_time) {
+    start = i;
+    end = (i + col_per_time > params.nx - 1) ? params.nx - 1 : i + col_per_time;
+    // printf("collision(%d, %d)   streaming(%d, %d)\n", start, end, last_end,
+    //        end - 1);
+    collision(start, end, params, cells, tmp_cells, obstacles);
+    // obstacle(params, cells, tmp_cells, obstacles);
+    streaming(last_end, end - 1, params, cells, tmp_cells);
+    last_end = end - 1;
+  }
+  streaming(end - 1, end + 1, params, cells, tmp_cells);
+  // printf("streaming(%d, %d)\n", end - 1, end + 1);
   boundary(params, cells, tmp_cells, inlets);
+  // exit(0);
   return EXIT_SUCCESS;
 }
 
@@ -30,8 +44,8 @@ int timestep(const t_param params, t_speed *cells, t_speed *tmp_cells,
 ** The collision of fluids in the cell is calculated using
 ** the local equilibrium distribution and relaxation process
 */
-int collision(const t_param params, t_speed *cells, t_speed *tmp_cells,
-              int *obstacles) {
+int collision(int start_col, int end_col, const t_param params, t_speed *cells,
+              t_speed *tmp_cells, int *obstacles) {
   const float c_sq = 1.f / 3.f; /* square of speed of sound */
   const float w0 = 4.f / 9.f;   /* weighting factor */
   const float w1 = 1.f / 9.f;   /* weighting factor */
@@ -46,9 +60,10 @@ int collision(const t_param params, t_speed *cells, t_speed *tmp_cells,
   __m256 _2_c_c = _mm256_set1_ps(2.f * c_sq * c_sq);
   __m256 w = _mm256_setr_ps(w1, w1, w1, w1, w2, w2, w2, w2);
   __m256 omega = _mm256_set1_ps(params.omega);
+
 #pragma omp parallel for
   for (int jj = 0; jj < params.ny; jj++) {
-    for (int ii = 0; ii < params.nx; ii++) {
+    for (int ii = start_col; ii < end_col; ii++) {
       if (!obstacles[ii + jj * params.nx]) {
         /* compute local density total */
         float local_density = 0.f;
@@ -152,6 +167,25 @@ int collision(const t_param params, t_speed *cells, t_speed *tmp_cells,
         //       params.omega *
         //           (d_equ[kk] - cells[ii + jj * params.nx].speeds[kk]);
         // }
+      } else {
+        tmp_cells[ii + jj * params.nx].speeds[0] =
+            cells[ii + jj * params.nx].speeds[0];
+        tmp_cells[ii + jj * params.nx].speeds[1] =
+            cells[ii + jj * params.nx].speeds[3];
+        tmp_cells[ii + jj * params.nx].speeds[2] =
+            cells[ii + jj * params.nx].speeds[4];
+        tmp_cells[ii + jj * params.nx].speeds[3] =
+            cells[ii + jj * params.nx].speeds[1];
+        tmp_cells[ii + jj * params.nx].speeds[4] =
+            cells[ii + jj * params.nx].speeds[2];
+        tmp_cells[ii + jj * params.nx].speeds[5] =
+            cells[ii + jj * params.nx].speeds[7];
+        tmp_cells[ii + jj * params.nx].speeds[6] =
+            cells[ii + jj * params.nx].speeds[8];
+        tmp_cells[ii + jj * params.nx].speeds[7] =
+            cells[ii + jj * params.nx].speeds[5];
+        tmp_cells[ii + jj * params.nx].speeds[8] =
+            cells[ii + jj * params.nx].speeds[6];
       }
     }
   }
@@ -199,11 +233,13 @@ int obstacle(const t_param params, t_speed *cells, t_speed *tmp_cells,
 /*
 ** Particles flow to the corresponding cell according to their speed direaction.
 */
-int streaming(const t_param params, t_speed *cells, t_speed *tmp_cells) {
+int streaming(int start_col, int end_col, const t_param params, t_speed *cells,
+              t_speed *tmp_cells) {
   /* loop over _all_ cells */
+
 #pragma omp parallel for
   for (int jj = 0; jj < params.ny; jj++) {
-    for (int ii = 0; ii < params.nx; ii++) {
+    for (int ii = start_col; ii < end_col; ii++) {
       /* determine indices of axis-direction neighbours
       ** respecting periodic boundary conditions (wrap around) */
       int y_n = (jj + 1) % params.ny;
