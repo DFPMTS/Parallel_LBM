@@ -20,21 +20,23 @@ int boundary(const t_param params, t_speed *cells, t_speed *tmp_cells,
 int timestep(const t_param params, t_speed *cells, t_speed *tmp_cells,
              float *inlets, int *obstacles) {
   /* The main time overhead, you should mainly optimize these processes. */
-  int col_per_time = 130, start, end, last_end = 0;
-  collision(params.nx - 1, params.nx, params, cells, tmp_cells, obstacles);
-  // printf("collision(%d, %d)\n", params.ny - 1, params.ny);
-  for (int i = 0; i < params.nx - 1; i += col_per_time) {
+  int col_per_time = 130, start, end, last_end = 0, last_trunk = 3;
+  collision(params.nx - last_trunk, params.nx, params, cells, tmp_cells,
+            obstacles);
+  // printf("collision(%d, %d)\n", params.nx - last_trunk, params.nx);
+  for (int i = 0; i < params.nx - last_trunk; i += col_per_time) {
     start = i;
-    end = (i + col_per_time > params.nx - 1) ? params.nx - 1 : i + col_per_time;
+    end = (i + col_per_time > params.nx - last_trunk) ? params.nx - last_trunk
+                                                      : i + col_per_time;
     // printf("collision(%d, %d)   streaming(%d, %d)\n", start, end, last_end,
-    //        end - 1);
+    //  end - 1);
     collision(start, end, params, cells, tmp_cells, obstacles);
     // obstacle(params, cells, tmp_cells, obstacles);
     streaming(last_end, end - 1, params, cells, tmp_cells);
     last_end = end - 1;
   }
-  streaming(end - 1, end + 1, params, cells, tmp_cells);
-  // printf("streaming(%d, %d)\n", end - 1, end + 1);
+  streaming(last_end, end + last_trunk, params, cells, tmp_cells);
+  // printf("streaming(%d, %d)\n", last_end, end + last_trunk);
   boundary(params, cells, tmp_cells, inlets);
   // exit(0);
   return EXIT_SUCCESS;
@@ -242,8 +244,8 @@ int streaming(int start_col, int end_col, const t_param params, t_speed *cells,
     for (int ii = start_col; ii < end_col; ii++) {
       /* determine indices of axis-direction neighbours
       ** respecting periodic boundary conditions (wrap around) */
-      int y_n = (jj + 1) % params.ny;
-      int x_e = (ii + 1) % params.nx;
+      int y_n = ((jj + 1) >= params.ny) ? 0 : jj + 1;
+      int x_e = ((ii + 1) >= params.nx) ? 0 : ii + 1;
       int y_s = (jj == 0) ? (params.ny - 1) : (jj - 1);
       int x_w = (ii == 0) ? (params.nx - 1) : (ii - 1);
       /* propagate densities from neighbouring cells, following
