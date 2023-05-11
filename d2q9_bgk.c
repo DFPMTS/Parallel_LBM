@@ -23,11 +23,11 @@ int boundary(const t_param params, t_speed *cells, t_speed *tmp_cells,
 int timestep(const t_param params, t_speed *cells, t_speed *tmp_cells,
              float *inlets, int *obstacles) {
   /* The main time overhead, you should mainly optimize these processes. */
-#pragma omp parallel
-  {
-    int col_per_time = params.nx / omp_get_num_threads() + 1;
-    int id = omp_get_thread_num();
-    int start = id * col_per_time, end = (id + 1) * col_per_time;
+  int col_per_time = 128;
+  int chunks = (params.nx - 1) / col_per_time + 1;
+#pragma omp parallel for
+  for (int i = 0; i < chunks; ++i) {
+    int start = i * col_per_time, end = (i + 1) * col_per_time;
     if (end > params.nx)
       end = params.nx;
     collision(0, start, end, params, cells, tmp_cells, obstacles);
@@ -39,16 +39,16 @@ int timestep(const t_param params, t_speed *cells, t_speed *tmp_cells,
     streaming(0, start + 1, end - 1, params, cells, tmp_cells);
     streaming(params.ny - 1, start + 1, end - 1, params, cells, tmp_cells);
   }
-#pragma omp parallel
-  {
-    int col_per_time = params.nx / omp_get_num_threads() + 1;
-    int id = omp_get_thread_num();
-    int start = id * col_per_time, end = (id + 1) * col_per_time;
+
+#pragma omp parallel for
+  for (int i = 0; i < chunks; ++i) {
+    int start = i * col_per_time, end = (i + 1) * col_per_time;
     if (end > params.nx)
       end = params.nx;
     streaming_col(start, 0, params.ny, params, cells, tmp_cells);
     streaming_col(end - 1, 0, params.ny, params, cells, tmp_cells);
   }
+
   boundary(params, cells, tmp_cells, inlets);
   // exit(0);
   return EXIT_SUCCESS;
