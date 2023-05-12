@@ -1,5 +1,6 @@
 #include "d2q9_bgk.h"
 #include "immintrin.h"
+#include <string.h>
 #include <xmmintrin.h>
 
 /* The main processes in one step */
@@ -20,10 +21,11 @@ int boundary(const t_param params, t_speed *cells, t_speed *tmp_cells,
 int timestep(const t_param params, t_speed *cells, t_speed *tmp_cells,
              float *inlets, int *obstacles) {
   /* The main time overhead, you should mainly optimize these processes. */
-  int col_per_time = 130, start, end, last_end = 0, last_trunk = 3;
+  int col_per_time = 130, start, end, last_end = 0, last_trunk = 5;
   collision(params.nx - last_trunk, params.nx, params, cells, tmp_cells,
             obstacles);
   // printf("collision(%d, %d)\n", params.nx - last_trunk, params.nx);
+
   for (int i = 0; i < params.nx - last_trunk; i += col_per_time) {
     start = i;
     end = (i + col_per_time > params.nx - last_trunk) ? params.nx - last_trunk
@@ -32,12 +34,13 @@ int timestep(const t_param params, t_speed *cells, t_speed *tmp_cells,
     //  end - 1);
     collision(start, end, params, cells, tmp_cells, obstacles);
     // obstacle(params, cells, tmp_cells, obstacles);
-    streaming(last_end, end - 1, params, cells, tmp_cells);
+    streaming(last_end, end - 1, params, tmp_cells, cells);
     last_end = end - 1;
   }
-  streaming(last_end, end + last_trunk, params, cells, tmp_cells);
+  streaming(last_end, end + last_trunk, params, tmp_cells, cells);
   // printf("streaming(%d, %d)\n", last_end, end + last_trunk);
-  boundary(params, cells, tmp_cells, inlets);
+  boundary(params, tmp_cells, cells, inlets);
+
   // exit(0);
   return EXIT_SUCCESS;
 }
@@ -48,10 +51,10 @@ int timestep(const t_param params, t_speed *cells, t_speed *tmp_cells,
 */
 int collision(int start_col, int end_col, const t_param params, t_speed *cells,
               t_speed *tmp_cells, int *obstacles) {
-  const float c_sq = 1.f / 3.f; /* square of speed of sound */
-  const float w0 = 4.f / 9.f;   /* weighting factor */
-  const float w1 = 1.f / 9.f;   /* weighting factor */
-  const float w2 = 1.f / 36.f;  /* weighting factor */
+  static const float c_sq = 1.f / 3.f; /* square of speed of sound */
+  static const float w0 = 4.f / 9.f;   /* weighting factor */
+  static const float w1 = 1.f / 9.f;   /* weighting factor */
+  static const float w2 = 1.f / 36.f;  /* weighting factor */
 
   /* loop over the cells in the grid
   ** the collision step is called before
@@ -66,6 +69,7 @@ int collision(int start_col, int end_col, const t_param params, t_speed *cells,
 #pragma omp parallel for
   for (int jj = 0; jj < params.ny; jj++) {
     for (int ii = start_col; ii < end_col; ii++) {
+      t_speed buffer;
       if (!obstacles[ii + jj * params.nx]) {
         /* compute local density total */
         float local_density = 0.f;
@@ -155,14 +159,14 @@ int collision(int start_col, int end_col, const t_param params, t_speed *cells,
         //            (1.f + u[8] / c_sq + (u[8] * u[8]) / (2.f * c_sq * c_sq) -
         //             u_sq / (2.f * c_sq));
         /* relaxation step */
-        tmp_cells[ii + jj * params.nx].speeds[0] =
+        buffer.speeds[0] =
             cells[ii + jj * params.nx].speeds[0] +
             params.omega * (d_equ[0] - cells[ii + jj * params.nx].speeds[0]);
         __m256 c_s = _mm256_loadu_ps(cells[ii + jj * params.nx].speeds + 1);
         res = _mm256_sub_ps(res, c_s);
         res = _mm256_mul_ps(res, omega);
         res = _mm256_add_ps(res, c_s);
-        _mm256_storeu_ps(tmp_cells[ii + jj * params.nx].speeds + 1, res);
+        _mm256_storeu_ps(buffer.speeds + 1, res);
         // for (int kk = 0; kk < NSPEEDS; kk++) {
         //   tmp_cells[ii + jj * params.nx].speeds[kk] =
         //       cells[ii + jj * params.nx].speeds[kk] +
@@ -170,63 +174,17 @@ int collision(int start_col, int end_col, const t_param params, t_speed *cells,
         //           (d_equ[kk] - cells[ii + jj * params.nx].speeds[kk]);
         // }
       } else {
-        tmp_cells[ii + jj * params.nx].speeds[0] =
-            cells[ii + jj * params.nx].speeds[0];
-        tmp_cells[ii + jj * params.nx].speeds[1] =
-            cells[ii + jj * params.nx].speeds[3];
-        tmp_cells[ii + jj * params.nx].speeds[2] =
-            cells[ii + jj * params.nx].speeds[4];
-        tmp_cells[ii + jj * params.nx].speeds[3] =
-            cells[ii + jj * params.nx].speeds[1];
-        tmp_cells[ii + jj * params.nx].speeds[4] =
-            cells[ii + jj * params.nx].speeds[2];
-        tmp_cells[ii + jj * params.nx].speeds[5] =
-            cells[ii + jj * params.nx].speeds[7];
-        tmp_cells[ii + jj * params.nx].speeds[6] =
-            cells[ii + jj * params.nx].speeds[8];
-        tmp_cells[ii + jj * params.nx].speeds[7] =
-            cells[ii + jj * params.nx].speeds[5];
-        tmp_cells[ii + jj * params.nx].speeds[8] =
-            cells[ii + jj * params.nx].speeds[6];
+        buffer.speeds[0] = cells[ii + jj * params.nx].speeds[0];
+        buffer.speeds[1] = cells[ii + jj * params.nx].speeds[3];
+        buffer.speeds[2] = cells[ii + jj * params.nx].speeds[4];
+        buffer.speeds[3] = cells[ii + jj * params.nx].speeds[1];
+        buffer.speeds[4] = cells[ii + jj * params.nx].speeds[2];
+        buffer.speeds[5] = cells[ii + jj * params.nx].speeds[7];
+        buffer.speeds[6] = cells[ii + jj * params.nx].speeds[8];
+        buffer.speeds[7] = cells[ii + jj * params.nx].speeds[5];
+        buffer.speeds[8] = cells[ii + jj * params.nx].speeds[6];
       }
-    }
-  }
-  return EXIT_SUCCESS;
-}
-
-/*
-** For obstacles, mirror their speed.
-*/
-int obstacle(const t_param params, t_speed *cells, t_speed *tmp_cells,
-             int *obstacles) {
-
-/* loop over the cells in the grid */
-#pragma omp parallel for
-  for (int jj = 0; jj < params.ny; jj++) {
-    for (int ii = 0; ii < params.nx; ii++) {
-      /* if the cell contains an obstacle */
-      if (obstacles[jj * params.nx + ii]) {
-        /* called after collision, so taking values from scratch space
-        ** mirroring, and writing into main grid */
-        tmp_cells[ii + jj * params.nx].speeds[0] =
-            cells[ii + jj * params.nx].speeds[0];
-        tmp_cells[ii + jj * params.nx].speeds[1] =
-            cells[ii + jj * params.nx].speeds[3];
-        tmp_cells[ii + jj * params.nx].speeds[2] =
-            cells[ii + jj * params.nx].speeds[4];
-        tmp_cells[ii + jj * params.nx].speeds[3] =
-            cells[ii + jj * params.nx].speeds[1];
-        tmp_cells[ii + jj * params.nx].speeds[4] =
-            cells[ii + jj * params.nx].speeds[2];
-        tmp_cells[ii + jj * params.nx].speeds[5] =
-            cells[ii + jj * params.nx].speeds[7];
-        tmp_cells[ii + jj * params.nx].speeds[6] =
-            cells[ii + jj * params.nx].speeds[8];
-        tmp_cells[ii + jj * params.nx].speeds[7] =
-            cells[ii + jj * params.nx].speeds[5];
-        tmp_cells[ii + jj * params.nx].speeds[8] =
-            cells[ii + jj * params.nx].speeds[6];
-      }
+      memcpy(&cells[ii + jj * params.nx], &buffer, sizeof(buffer));
     }
   }
   return EXIT_SUCCESS;
