@@ -12,6 +12,8 @@ int obstacle(const t_param params, t_speed *cells, t_speed *tmp_cells,
              int *obstacles);
 int boundary(const t_param params, t_speed *cells, t_speed *tmp_cells,
              float *inlets);
+int fuse(int start_col, int end_col, const t_param params, t_speed *cells,
+         t_speed *tmp_cells, int *obstacles);
 
 /*
 ** The main calculation methods.
@@ -22,21 +24,24 @@ int timestep(const t_param params, t_speed *cells, t_speed *tmp_cells,
              float *inlets, int *obstacles) {
   /* The main time overhead, you should mainly optimize these processes. */
   int col_per_time = 130, start, end, last_end = 0, last_trunk = 5;
-  collision(params.nx - last_trunk, params.nx, params, cells, tmp_cells,
-            obstacles);
-  // printf("collision(%d, %d)\n", params.nx - last_trunk, params.nx);
+  // collision(params.nx - last_trunk, params.nx, params, cells, tmp_cells,
+  //           obstacles);
+  // // printf("collision(%d, %d)\n", params.nx - last_trunk, params.nx);
 
-  for (int i = 0; i < params.nx - last_trunk; i += col_per_time) {
-    start = i;
-    end = (i + col_per_time > params.nx - last_trunk) ? params.nx - last_trunk
-                                                      : i + col_per_time;
-    // printf("collision(%d, %d)   streaming(%d, %d)\n", start, end, last_end,
-    //  end - 1);
-    collision(start, end, params, cells, tmp_cells, obstacles);
-    // obstacle(params, cells, tmp_cells, obstacles);
-    // streaming(last_end, end - 1, params, tmp_cells, cells);
-    last_end = end - 1;
-  }
+  // for (int i = 0; i < params.nx - last_trunk; i += col_per_time) {
+  //   start = i;
+  //   end = (i + col_per_time > params.nx - last_trunk) ? params.nx -
+  //   last_trunk
+  //                                                     : i + col_per_time;
+  //   // printf("collision(%d, %d)   streaming(%d, %d)\n", start, end,
+  //   last_end,
+  //   //  end - 1);
+  //   collision(start, end, params, cells, tmp_cells, obstacles);
+  //   // obstacle(params, cells, tmp_cells, obstacles);
+  //   streaming(last_end, end - 1, params, tmp_cells, cells);
+  //   last_end = end - 1;
+  // }
+  fuse(0, params.nx, params, cells, tmp_cells, obstacles);
   // streaming(last_end, end + last_trunk, params, tmp_cells, cells);
   // printf("streaming(%d, %d)\n", last_end, end + last_trunk);
   boundary(params, tmp_cells, cells, inlets);
@@ -49,8 +54,8 @@ int timestep(const t_param params, t_speed *cells, t_speed *tmp_cells,
 ** The collision of fluids in the cell is calculated using
 ** the local equilibrium distribution and relaxation process
 */
-int collision(int start_col, int end_col, const t_param params, t_speed *cells,
-              t_speed *tmp_cells, int *obstacles) {
+int fuse(int start_col, int end_col, const t_param params, t_speed *cells,
+         t_speed *tmp_cells, int *obstacles) {
   static const float c_sq = 1.f / 3.f; /* square of speed of sound */
   static const float w0 = 4.f / 9.f;   /* weighting factor */
   static const float w1 = 1.f / 9.f;   /* weighting factor */
@@ -193,8 +198,7 @@ int collision(int start_col, int end_col, const t_param params, t_speed *cells,
       ** appropriate directions of travel and writing into
       ** scratch space grid */
       tmp_cells[ii + jj * params.nx].speeds[0] =
-          tmp_cells[ii + jj * params.nx]
-              .speeds[0]; /* central cell, no movement */
+          buffer.speeds[0]; /* central cell, no movement */
       tmp_cells[x_e + jj * params.nx].speeds[1] = buffer.speeds[1]; /* east */
       tmp_cells[ii + y_n * params.nx].speeds[2] = buffer.speeds[2]; /* north */
       tmp_cells[x_w + jj * params.nx].speeds[3] = buffer.speeds[3]; /* west */
@@ -212,8 +216,149 @@ int collision(int start_col, int end_col, const t_param params, t_speed *cells,
   return EXIT_SUCCESS;
 }
 
+int collision(int start_col, int end_col, const t_param params, t_speed *cells,
+              t_speed *tmp_cells, int *obstacles) {
+  static const float c_sq = 1.f / 3.f; /* square of speed of sound */
+  static const float w0 = 4.f / 9.f;   /* weighting factor */
+  static const float w1 = 1.f / 9.f;   /* weighting factor */
+  static const float w2 = 1.f / 36.f;  /* weighting factor */
+
+  /* loop over the cells in the grid
+  ** the collision step is called before
+  ** the streaming step and so values of interest
+  ** are in the scratch-space grid */
+  __m256 _1 = _mm256_set1_ps(1.f);
+  __m256 c = _mm256_set1_ps(c_sq);
+  __m256 _2_c_c = _mm256_set1_ps(2.f * c_sq * c_sq);
+  __m256 w = _mm256_setr_ps(w1, w1, w1, w1, w2, w2, w2, w2);
+  __m256 omega = _mm256_set1_ps(params.omega);
+
+#pragma omp parallel for
+  for (int jj = 0; jj < params.ny; jj++) {
+    for (int ii = start_col; ii < end_col; ii++) {
+      t_speed buffer;
+      if (!obstacles[ii + jj * params.nx]) {
+        /* compute local density total */
+        float local_density = 0.f;
+
+        for (int kk = 0; kk < NSPEEDS; kk++) {
+          local_density += cells[ii + jj * params.nx].speeds[kk];
+        }
+
+        /* compute x velocity component */
+        float u_x = (cells[ii + jj * params.nx].speeds[1] +
+                     cells[ii + jj * params.nx].speeds[5] +
+                     cells[ii + jj * params.nx].speeds[8] -
+                     (cells[ii + jj * params.nx].speeds[3] +
+                      cells[ii + jj * params.nx].speeds[6] +
+                      cells[ii + jj * params.nx].speeds[7])) /
+                    local_density;
+        /* compute y velocity component */
+        float u_y = (cells[ii + jj * params.nx].speeds[2] +
+                     cells[ii + jj * params.nx].speeds[5] +
+                     cells[ii + jj * params.nx].speeds[6] -
+                     (cells[ii + jj * params.nx].speeds[4] +
+                      cells[ii + jj * params.nx].speeds[7] +
+                      cells[ii + jj * params.nx].speeds[8])) /
+                    local_density;
+
+        /* velocity squared */
+        float u_sq = u_x * u_x + u_y * u_y;
+
+        /* directional velocity components */
+        float u[NSPEEDS];
+        u[0] = 0;          /* zero */
+        u[1] = u_x;        /* east */
+        u[2] = u_y;        /* north */
+        u[3] = -u_x;       /* west */
+        u[4] = -u_y;       /* south */
+        u[5] = u_x + u_y;  /* north-east */
+        u[6] = -u_x + u_y; /* north-west */
+        u[7] = -u_x - u_y; /* south-west */
+        u[8] = u_x - u_y;  /* south-east */
+
+        /* equilibrium densities */
+        float d_equ[NSPEEDS];
+        /* zero velocity density: weight w0 */
+
+        d_equ[0] = w0 * local_density *
+                   (1.f + u[0] / c_sq + (u[0] * u[0]) / (2.f * c_sq * c_sq) -
+                    u_sq / (2.f * c_sq));
+        __m256 x = _mm256_loadu_ps(u + 1);
+
+        __m256 l_d = _mm256_set1_ps(local_density);
+
+        __m256 u_2_c = _mm256_set1_ps(u_sq / (2.f * c_sq));
+        __m256 x_2 = _mm256_mul_ps(x, x);
+        x = _mm256_div_ps(x, c);
+        x_2 = _mm256_div_ps(x_2, _2_c_c);
+        __m256 res_1 = _mm256_add_ps(_1, x);
+        __m256 res_2 = _mm256_sub_ps(x_2, u_2_c);
+        __m256 res = _mm256_add_ps(res_1, res_2);
+        res = _mm256_mul_ps(res, l_d);
+
+        res = _mm256_mul_ps(res, w);
+        _mm256_storeu_ps(d_equ + 1, res);
+        /* axis speeds: weight w1 */
+        // d_equ[1] = w1 * local_density *
+        //            (1.f + u[1] / c_sq + (u[1] * u[1]) / (2.f * c_sq * c_sq) -
+        //             u_sq / (2.f * c_sq));
+        // d_equ[2] = w1 * local_density *
+        //            (1.f + u[2] / c_sq + (u[2] * u[2]) / (2.f * c_sq * c_sq) -
+        //             u_sq / (2.f * c_sq));
+        // d_equ[3] = w1 * local_density *
+        //            (1.f + u[3] / c_sq + (u[3] * u[3]) / (2.f * c_sq * c_sq) -
+        //             u_sq / (2.f * c_sq));
+        // d_equ[4] = w1 * local_density *
+        //            (1.f + u[4] / c_sq + (u[4] * u[4]) / (2.f * c_sq * c_sq) -
+        //             u_sq / (2.f * c_sq));
+        // /* diagonal speeds: weight w2 */
+        // d_equ[5] = w2 * local_density *
+        //            (1.f + u[5] / c_sq + (u[5] * u[5]) / (2.f * c_sq * c_sq) -
+        //             u_sq / (2.f * c_sq));
+        // d_equ[6] = w2 * local_density *
+        //            (1.f + u[6] / c_sq + (u[6] * u[6]) / (2.f * c_sq * c_sq) -
+        //             u_sq / (2.f * c_sq));
+        // d_equ[7] = w2 * local_density *
+        //            (1.f + u[7] / c_sq + (u[7] * u[7]) / (2.f * c_sq * c_sq) -
+        //             u_sq / (2.f * c_sq));
+        // d_equ[8] = w2 * local_density *
+        //            (1.f + u[8] / c_sq + (u[8] * u[8]) / (2.f * c_sq * c_sq) -
+        //             u_sq / (2.f * c_sq));
+        /* relaxation step */
+        buffer.speeds[0] =
+            cells[ii + jj * params.nx].speeds[0] +
+            params.omega * (d_equ[0] - cells[ii + jj * params.nx].speeds[0]);
+        __m256 c_s = _mm256_loadu_ps(cells[ii + jj * params.nx].speeds + 1);
+        res = _mm256_sub_ps(res, c_s);
+        res = _mm256_mul_ps(res, omega);
+        res = _mm256_add_ps(res, c_s);
+        _mm256_storeu_ps(buffer.speeds + 1, res);
+        // for (int kk = 0; kk < NSPEEDS; kk++) {
+        //   tmp_cells[ii + jj * params.nx].speeds[kk] =
+        //       cells[ii + jj * params.nx].speeds[kk] +
+        //       params.omega *
+        //           (d_equ[kk] - cells[ii + jj * params.nx].speeds[kk]);
+        // }
+      } else {
+        buffer.speeds[0] = cells[ii + jj * params.nx].speeds[0];
+        buffer.speeds[1] = cells[ii + jj * params.nx].speeds[3];
+        buffer.speeds[2] = cells[ii + jj * params.nx].speeds[4];
+        buffer.speeds[3] = cells[ii + jj * params.nx].speeds[1];
+        buffer.speeds[4] = cells[ii + jj * params.nx].speeds[2];
+        buffer.speeds[5] = cells[ii + jj * params.nx].speeds[7];
+        buffer.speeds[6] = cells[ii + jj * params.nx].speeds[8];
+        buffer.speeds[7] = cells[ii + jj * params.nx].speeds[5];
+        buffer.speeds[8] = cells[ii + jj * params.nx].speeds[6];
+      }
+      memcpy(&cells[ii + jj * params.nx], &buffer, sizeof(buffer));
+    }
+  }
+}
+
 /*
-** Particles flow to the corresponding cell according to their speed direaction.
+** Particles flow to the corresponding cell according to their speed
+*direaction.
 */
 int streaming(int start_col, int end_col, const t_param params, t_speed *cells,
               t_speed *tmp_cells) {
