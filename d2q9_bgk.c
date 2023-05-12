@@ -73,8 +73,8 @@ int fuse(int start_col, int end_col, const t_param params, t_speed *cells,
 
 #pragma omp parallel for
   for (int jj = 0; jj < params.ny; jj++) {
+    t_speed buffer;
     for (int ii = start_col; ii < end_col; ii++) {
-      t_speed buffer;
       if (!obstacles[ii + jj * params.nx]) {
         /* compute local density total */
         float local_density = 0.f;
@@ -189,7 +189,8 @@ int fuse(int start_col, int end_col, const t_param params, t_speed *cells,
         buffer.speeds[7] = cells[ii + jj * params.nx].speeds[5];
         buffer.speeds[8] = cells[ii + jj * params.nx].speeds[6];
       }
-      memcpy(&cells[ii + jj * params.nx], &buffer, sizeof(buffer));
+      if (ii == 0 || jj == 0 || ii == params.nx - 1 || jj == params.ny - 1)
+        memcpy(&cells[ii + jj * params.nx], &buffer, sizeof(buffer));
       int y_n = ((jj + 1) >= params.ny) ? 0 : jj + 1;
       int x_e = ((ii + 1) >= params.nx) ? 0 : ii + 1;
       int y_s = (jj == 0) ? (params.ny - 1) : (jj - 1);
