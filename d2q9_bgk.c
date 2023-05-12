@@ -34,10 +34,10 @@ int timestep(const t_param params, t_speed *cells, t_speed *tmp_cells,
     //  end - 1);
     collision(start, end, params, cells, tmp_cells, obstacles);
     // obstacle(params, cells, tmp_cells, obstacles);
-    streaming(last_end, end - 1, params, tmp_cells, cells);
+    // streaming(last_end, end - 1, params, tmp_cells, cells);
     last_end = end - 1;
   }
-  streaming(last_end, end + last_trunk, params, tmp_cells, cells);
+  // streaming(last_end, end + last_trunk, params, tmp_cells, cells);
   // printf("streaming(%d, %d)\n", last_end, end + last_trunk);
   boundary(params, tmp_cells, cells, inlets);
 
@@ -185,6 +185,28 @@ int collision(int start_col, int end_col, const t_param params, t_speed *cells,
         buffer.speeds[8] = cells[ii + jj * params.nx].speeds[6];
       }
       memcpy(&cells[ii + jj * params.nx], &buffer, sizeof(buffer));
+      int y_n = ((jj + 1) >= params.ny) ? 0 : jj + 1;
+      int x_e = ((ii + 1) >= params.nx) ? 0 : ii + 1;
+      int y_s = (jj == 0) ? (params.ny - 1) : (jj - 1);
+      int x_w = (ii == 0) ? (params.nx - 1) : (ii - 1);
+      /* propagate densities from neighbouring cells, following
+      ** appropriate directions of travel and writing into
+      ** scratch space grid */
+      tmp_cells[ii + jj * params.nx].speeds[0] =
+          tmp_cells[ii + jj * params.nx]
+              .speeds[0]; /* central cell, no movement */
+      tmp_cells[x_e + jj * params.nx].speeds[1] = buffer.speeds[1]; /* east */
+      tmp_cells[ii + y_n * params.nx].speeds[2] = buffer.speeds[2]; /* north */
+      tmp_cells[x_w + jj * params.nx].speeds[3] = buffer.speeds[3]; /* west */
+      tmp_cells[ii + y_s * params.nx].speeds[4] = buffer.speeds[4]; /* south */
+      tmp_cells[x_e + y_n * params.nx].speeds[5] =
+          buffer.speeds[5]; /* north-east */
+      tmp_cells[x_w + y_n * params.nx].speeds[6] =
+          buffer.speeds[6]; /* north-west */
+      tmp_cells[x_w + y_s * params.nx].speeds[7] =
+          buffer.speeds[7]; /* south-west */
+      tmp_cells[x_e + y_s * params.nx].speeds[8] =
+          buffer.speeds[8]; /* south-east */
     }
   }
   return EXIT_SUCCESS;
