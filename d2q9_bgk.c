@@ -13,8 +13,8 @@ int obstacle(const t_param params, t_speed *cells, t_speed *tmp_cells,
              int *obstacles);
 int boundary(const t_param params, t_speed *cells, t_speed *tmp_cells,
              float *inlets);
-int fuse(int start_col, int end_col, const t_param params, t_speed *cells,
-         t_speed *tmp_cells, int *obstacles);
+inline int fuse(int start_col, int end_col, const t_param params,
+                t_speed *cells, t_speed *tmp_cells, int *obstacles);
 
 /*
 ** The main calculation methods.
@@ -42,8 +42,8 @@ int timestep(const t_param params, t_speed *cells, t_speed *tmp_cells,
 t_speed buffer[chunk_y][chunk_x];
 float u[NSPEEDS];
 float d_equ[NSPEEDS];
-int fuse(int start_col, int end_col, const t_param params, t_speed *cells,
-         t_speed *tmp_cells, int *obstacles) {
+inline int fuse(int start_col, int end_col, const t_param params,
+                t_speed *cells, t_speed *tmp_cells, int *obstacles) {
   static const float c_sq = 1.f / 3.f; /* square of speed of sound */
   static const float w0 = 4.f / 9.f;   /* weighting factor */
   static const float w1 = 1.f / 9.f;   /* weighting factor */
@@ -136,12 +136,9 @@ int fuse(int start_col, int end_col, const t_param params, t_speed *cells,
 
               /* zero velocity density: weight w0 */
 
-              d_equ[0] =
-                  w0 * local_density *
-                  (1.f + u[0] / c_sq + (u[0] * u[0]) / (2.f * c_sq * c_sq) -
-                   u_sq / (2.f * c_sq));
-              x = _mm256_loadu_ps(u + 1);
+              d_equ[0] = w0 * local_density * (1.f - u_sq / (2.f * c_sq));
 
+              x = _mm256_loadu_ps(u + 1);
               l_d = _mm256_set1_ps(local_density);
               u_2_c = _mm256_set1_ps(u_sq / (2.f * c_sq));
               x_2 = _mm256_mul_ps(x, x);
@@ -419,8 +416,8 @@ int streaming(int start_col, int end_col, const t_param params, t_speed *cells,
 ** the left border is the inlet of fixed speed, and
 ** the right border is the open outlet of the first-order approximation.
 */
-int boundary(const t_param params, t_speed *cells, t_speed *tmp_cells,
-             float *inlets) {
+inline int boundary(const t_param params, t_speed *cells, t_speed *tmp_cells,
+                    float *inlets) {
   /* Set the constant coefficient */
   const float cst1 = 2.0 / 3.0;
   const float cst2 = 1.0 / 6.0;
