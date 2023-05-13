@@ -53,8 +53,8 @@ int fuse(int start_col, int end_col, const t_param params, t_speed *cells,
   __m256 w = _mm256_setr_ps(w1, w1, w1, w1, w2, w2, w2, w2);
   __m256 omega = _mm256_set1_ps(params.omega);
 
-  int chunk_x = 24;
-  int chunk_y = 24;
+  int chunk_x = 32;
+  int chunk_y = 32;
 
 #pragma omp parallel
   {
