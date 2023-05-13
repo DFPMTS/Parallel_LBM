@@ -36,6 +36,12 @@ int timestep(const t_param params, t_speed *cells, t_speed *tmp_cells,
 ** The collision of fluids in the cell is calculated using
 ** the local equilibrium distribution and relaxation process
 */
+
+#define chunk_x 128
+#define chunk_y 64
+t_speed buffer[chunk_y][chunk_x];
+float u[NSPEEDS];
+float d_equ[NSPEEDS];
 int fuse(int start_col, int end_col, const t_param params, t_speed *cells,
          t_speed *tmp_cells, int *obstacles) {
   static const float c_sq = 1.f / 3.f; /* square of speed of sound */
@@ -53,18 +59,13 @@ int fuse(int start_col, int end_col, const t_param params, t_speed *cells,
   __m256 w = _mm256_setr_ps(w1, w1, w1, w1, w2, w2, w2, w2);
   __m256 omega = _mm256_set1_ps(params.omega);
 
-  int chunk_x = 128;
-  int chunk_y = 64;
-
-#pragma omp parallel
+#pragma omp parallel private(buffer, u, d_equ)
   {
     int id = omp_get_thread_num();
     int col_per_thread = params.nx / omp_get_num_threads() + 1;
     int start_col = id * col_per_thread, end_col = (id + 1) * col_per_thread;
     int jj_start, jj_end, ii_start, ii_end;
-    t_speed buffer[chunk_x][chunk_y];
-    float u[NSPEEDS];
-    float d_equ[NSPEEDS];
+
     if (end_col > params.nx)
       end_col = params.nx;
     for (int j = 0; j < params.ny; j += chunk_y) {
