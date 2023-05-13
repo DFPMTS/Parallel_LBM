@@ -61,6 +61,21 @@ int fuse(int start_col, int end_col, const t_param params, t_speed *cells,
 
 #pragma omp parallel private(buffer, u, d_equ)
   {
+
+    float local_density;
+    float u_x;
+    float u_y;
+    float u_sq;
+    int kk;
+    __m256 x;
+    __m256 l_d;
+    __m256 u_2_c;
+    __m256 x_2;
+    __m256 res_1;
+    __m256 res_2;
+    __m256 res;
+    __m256 c_s;
+
     int id = omp_get_thread_num();
     int col_per_thread = params.nx / omp_get_num_threads() + 1;
     int start_col = id * col_per_thread, end_col = (id + 1) * col_per_thread;
@@ -79,31 +94,31 @@ int fuse(int start_col, int end_col, const t_param params, t_speed *cells,
                ii++, ii_offset++) {
             if (!obstacles[ii + jj * params.nx]) {
               /* compute local density total */
-              float local_density = 0.f;
+              local_density = 0.f;
 
-              for (int kk = 0; kk < NSPEEDS; kk++) {
+              for (kk = 0; kk < NSPEEDS; kk++) {
                 local_density += cells[ii + jj * params.nx].speeds[kk];
               }
 
               /* compute x velocity component */
-              float u_x = (cells[ii + jj * params.nx].speeds[1] +
-                           cells[ii + jj * params.nx].speeds[5] +
-                           cells[ii + jj * params.nx].speeds[8] -
-                           (cells[ii + jj * params.nx].speeds[3] +
-                            cells[ii + jj * params.nx].speeds[6] +
-                            cells[ii + jj * params.nx].speeds[7])) /
-                          local_density;
+              u_x = (cells[ii + jj * params.nx].speeds[1] +
+                     cells[ii + jj * params.nx].speeds[5] +
+                     cells[ii + jj * params.nx].speeds[8] -
+                     (cells[ii + jj * params.nx].speeds[3] +
+                      cells[ii + jj * params.nx].speeds[6] +
+                      cells[ii + jj * params.nx].speeds[7])) /
+                    local_density;
               /* compute y velocity component */
-              float u_y = (cells[ii + jj * params.nx].speeds[2] +
-                           cells[ii + jj * params.nx].speeds[5] +
-                           cells[ii + jj * params.nx].speeds[6] -
-                           (cells[ii + jj * params.nx].speeds[4] +
-                            cells[ii + jj * params.nx].speeds[7] +
-                            cells[ii + jj * params.nx].speeds[8])) /
-                          local_density;
+              u_y = (cells[ii + jj * params.nx].speeds[2] +
+                     cells[ii + jj * params.nx].speeds[5] +
+                     cells[ii + jj * params.nx].speeds[6] -
+                     (cells[ii + jj * params.nx].speeds[4] +
+                      cells[ii + jj * params.nx].speeds[7] +
+                      cells[ii + jj * params.nx].speeds[8])) /
+                    local_density;
 
               /* velocity squared */
-              float u_sq = u_x * u_x + u_y * u_y;
+              u_sq = u_x * u_x + u_y * u_y;
 
               /* directional velocity components */
 
@@ -125,17 +140,16 @@ int fuse(int start_col, int end_col, const t_param params, t_speed *cells,
                   w0 * local_density *
                   (1.f + u[0] / c_sq + (u[0] * u[0]) / (2.f * c_sq * c_sq) -
                    u_sq / (2.f * c_sq));
-              __m256 x = _mm256_loadu_ps(u + 1);
+              x = _mm256_loadu_ps(u + 1);
 
-              __m256 l_d = _mm256_set1_ps(local_density);
-
-              __m256 u_2_c = _mm256_set1_ps(u_sq / (2.f * c_sq));
-              __m256 x_2 = _mm256_mul_ps(x, x);
+              l_d = _mm256_set1_ps(local_density);
+              u_2_c = _mm256_set1_ps(u_sq / (2.f * c_sq));
+              x_2 = _mm256_mul_ps(x, x);
               x = _mm256_div_ps(x, c);
               x_2 = _mm256_div_ps(x_2, _2_c_c);
-              __m256 res_1 = _mm256_add_ps(_1, x);
-              __m256 res_2 = _mm256_sub_ps(x_2, u_2_c);
-              __m256 res = _mm256_add_ps(res_1, res_2);
+              res_1 = _mm256_add_ps(_1, x);
+              res_2 = _mm256_sub_ps(x_2, u_2_c);
+              res = _mm256_add_ps(res_1, res_2);
               res = _mm256_mul_ps(res, l_d);
 
               res = _mm256_mul_ps(res, w);
@@ -145,8 +159,7 @@ int fuse(int start_col, int end_col, const t_param params, t_speed *cells,
                   cells[ii + jj * params.nx].speeds[0] +
                   params.omega *
                       (d_equ[0] - cells[ii + jj * params.nx].speeds[0]);
-              __m256 c_s =
-                  _mm256_loadu_ps(cells[ii + jj * params.nx].speeds + 1);
+              c_s = _mm256_loadu_ps(cells[ii + jj * params.nx].speeds + 1);
               res = _mm256_sub_ps(res, c_s);
               res = _mm256_mul_ps(res, omega);
               res = _mm256_add_ps(res, c_s);
