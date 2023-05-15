@@ -37,9 +37,9 @@ int timestep(const t_param params, t_speed *cells, t_speed *tmp_cells,
 ** the local equilibrium distribution and relaxation process
 */
 
-#define chunk_x 256
-#define chunk_y 8
-t_speed buffer[chunk_y][chunk_x];
+#define chunk_x 64
+#define chunk_y 64
+t_speed buffer;
 inline int fuse(int start_col, int end_col, const t_param params,
                 t_speed *cells, t_speed *tmp_cells, int *obstacles) {
   static const float c_sq = 1.f / 3.f; /* square of speed of sound */
@@ -123,43 +123,28 @@ inline int fuse(int start_col, int end_col, const t_param params,
                   _mm256_mul_ps(res, _mm256_set1_ps(local_density)),
                   _mm256_setr_ps(w1, w1, w1, w1, w2, w2, w2, w2));
               /* relaxation step */
-              buffer[jj_offset][ii_offset].speeds[0] =
+              buffer.speeds[0] =
                   cells[ii + jj * params.nx].speeds[0] +
                   params.omega * (d_equ - cells[ii + jj * params.nx].speeds[0]);
               __m256 c_s =
                   _mm256_loadu_ps(cells[ii + jj * params.nx].speeds + 1);
               res = _mm256_add_ps(_mm256_mul_ps(_mm256_sub_ps(res, c_s), omega),
                                   c_s);
-              _mm256_storeu_ps(buffer[jj_offset][ii_offset].speeds + 1, res);
+              _mm256_storeu_ps(buffer.speeds + 1, res);
             } else {
-              buffer[jj_offset][ii_offset].speeds[0] =
-                  cells[ii + jj * params.nx].speeds[0];
-              buffer[jj_offset][ii_offset].speeds[1] =
-                  cells[ii + jj * params.nx].speeds[3];
-              buffer[jj_offset][ii_offset].speeds[2] =
-                  cells[ii + jj * params.nx].speeds[4];
-              buffer[jj_offset][ii_offset].speeds[3] =
-                  cells[ii + jj * params.nx].speeds[1];
-              buffer[jj_offset][ii_offset].speeds[4] =
-                  cells[ii + jj * params.nx].speeds[2];
-              buffer[jj_offset][ii_offset].speeds[5] =
-                  cells[ii + jj * params.nx].speeds[7];
-              buffer[jj_offset][ii_offset].speeds[6] =
-                  cells[ii + jj * params.nx].speeds[8];
-              buffer[jj_offset][ii_offset].speeds[7] =
-                  cells[ii + jj * params.nx].speeds[5];
-              buffer[jj_offset][ii_offset].speeds[8] =
-                  cells[ii + jj * params.nx].speeds[6];
+              buffer.speeds[0] = cells[ii + jj * params.nx].speeds[0];
+              buffer.speeds[1] = cells[ii + jj * params.nx].speeds[3];
+              buffer.speeds[2] = cells[ii + jj * params.nx].speeds[4];
+              buffer.speeds[3] = cells[ii + jj * params.nx].speeds[1];
+              buffer.speeds[4] = cells[ii + jj * params.nx].speeds[2];
+              buffer.speeds[5] = cells[ii + jj * params.nx].speeds[7];
+              buffer.speeds[6] = cells[ii + jj * params.nx].speeds[8];
+              buffer.speeds[7] = cells[ii + jj * params.nx].speeds[5];
+              buffer.speeds[8] = cells[ii + jj * params.nx].speeds[6];
             }
             if (ii == 0 || jj == 0 || ii == params.nx - 1 ||
                 jj == params.ny - 1)
-              memcpy(&cells[ii + jj * params.nx], &buffer[jj_offset][ii_offset],
-                     sizeof(buffer[jj_offset][ii_offset]));
-          }
-        }
-        for (int jj = jj_start, jj_offset = 0; jj < jj_end; jj++, jj_offset++) {
-          for (int ii = ii_start, ii_offset = 0; ii < ii_end;
-               ii++, ii_offset++) {
+              memcpy(&cells[ii + jj * params.nx], &buffer, sizeof(buffer));
             int y_n = ((jj + 1) >= params.ny) ? 0 : jj + 1;
             int x_e = ((ii + 1) >= params.nx) ? 0 : ii + 1;
             int y_s = (jj == 0) ? (params.ny - 1) : (jj - 1);
@@ -168,24 +153,23 @@ inline int fuse(int start_col, int end_col, const t_param params,
             ** appropriate directions of travel and writing into
             ** scratch space grid */
             tmp_cells[ii + jj * params.nx].speeds[0] =
-                buffer[jj_offset][ii_offset]
-                    .speeds[0]; /* central cell, no movement */
+                buffer.speeds[0]; /* central cell, no movement */
             tmp_cells[x_e + jj * params.nx].speeds[1] =
-                buffer[jj_offset][ii_offset].speeds[1]; /* east */
+                buffer.speeds[1]; /* east */
             tmp_cells[ii + y_n * params.nx].speeds[2] =
-                buffer[jj_offset][ii_offset].speeds[2]; /* north */
+                buffer.speeds[2]; /* north */
             tmp_cells[x_w + jj * params.nx].speeds[3] =
-                buffer[jj_offset][ii_offset].speeds[3]; /* west */
+                buffer.speeds[3]; /* west */
             tmp_cells[ii + y_s * params.nx].speeds[4] =
-                buffer[jj_offset][ii_offset].speeds[4]; /* south */
+                buffer.speeds[4]; /* south */
             tmp_cells[x_e + y_n * params.nx].speeds[5] =
-                buffer[jj_offset][ii_offset].speeds[5]; /* north-east */
+                buffer.speeds[5]; /* north-east */
             tmp_cells[x_w + y_n * params.nx].speeds[6] =
-                buffer[jj_offset][ii_offset].speeds[6]; /* north-west */
+                buffer.speeds[6]; /* north-west */
             tmp_cells[x_w + y_s * params.nx].speeds[7] =
-                buffer[jj_offset][ii_offset].speeds[7]; /* south-west */
+                buffer.speeds[7]; /* south-west */
             tmp_cells[x_e + y_s * params.nx].speeds[8] =
-                buffer[jj_offset][ii_offset].speeds[8]; /* south-east */
+                buffer.speeds[8]; /* south-east */
           }
         }
       }
