@@ -39,7 +39,6 @@ int timestep(const t_param params, t_speed *cells, t_speed *tmp_cells,
 
 #define chunk_x 64
 #define chunk_y 64
-t_speed buffer;
 inline int fuse(int start_col, int end_col, const t_param params,
                 t_speed *cells, t_speed *tmp_cells, int *obstacles) {
   static const float c_sq = 1.f / 3.f; /* square of speed of sound */
@@ -57,9 +56,9 @@ inline int fuse(int start_col, int end_col, const t_param params,
   __m256 w = _mm256_setr_ps(w1, w1, w1, w1, w2, w2, w2, w2);
   __m256 omega = _mm256_set1_ps(params.omega);
 
-#pragma omp parallel private(buffer)
+#pragma omp parallel
   {
-
+    t_speed buffer;
     int id = omp_get_thread_num();
     int col_per_thread = params.nx / omp_get_num_threads() + 1;
     int start_col = id * col_per_thread, end_col = (id + 1) * col_per_thread;
@@ -76,6 +75,10 @@ inline int fuse(int start_col, int end_col, const t_param params,
         for (int jj = jj_start, jj_offset = 0; jj < jj_end; jj++, jj_offset++) {
           for (int ii = ii_start, ii_offset = 0; ii < ii_end;
                ii++, ii_offset++) {
+            int y_n = ((jj + 1) >= params.ny) ? 0 : jj + 1;
+            int x_e = ((ii + 1) >= params.nx) ? 0 : ii + 1;
+            int y_s = (jj == 0) ? (params.ny - 1) : (jj - 1);
+            int x_w = (ii == 0) ? (params.nx - 1) : (ii - 1);
             if (!obstacles[ii + jj * params.nx]) {
               /* compute local density total */
               float local_density = 0.f;
@@ -145,10 +148,6 @@ inline int fuse(int start_col, int end_col, const t_param params,
             if (ii == 0 || jj == 0 || ii == params.nx - 1 ||
                 jj == params.ny - 1)
               memcpy(&cells[ii + jj * params.nx], &buffer, sizeof(buffer));
-            int y_n = ((jj + 1) >= params.ny) ? 0 : jj + 1;
-            int x_e = ((ii + 1) >= params.nx) ? 0 : ii + 1;
-            int y_s = (jj == 0) ? (params.ny - 1) : (jj - 1);
-            int x_w = (ii == 0) ? (params.nx - 1) : (ii - 1);
             /* propagate densities from neighbouring cells, following
             ** appropriate directions of travel and writing into
             ** scratch space grid */
