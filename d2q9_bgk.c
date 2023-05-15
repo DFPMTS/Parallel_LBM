@@ -75,10 +75,10 @@ inline int fuse(int start_col, int end_col, const t_param params,
         for (int jj = jj_start, jj_offset = 0; jj < jj_end; jj++, jj_offset++) {
           for (int ii = ii_start, ii_offset = 0; ii < ii_end;
                ii++, ii_offset++) {
-            int y_n = ((jj + 1) >= params.ny) ? 0 : jj + 1;
-            int x_e = ((ii + 1) >= params.nx) ? 0 : ii + 1;
-            int y_s = (jj == 0) ? (params.ny - 1) : (jj - 1);
-            int x_w = (ii == 0) ? (params.nx - 1) : (ii - 1);
+            int y_n = jj + 1;
+            int x_e = ii + 1;
+            int y_s = jj - 1;
+            int x_w = ii - 1;
             if (!obstacles[ii + jj * params.nx]) {
               /* compute local density total */
               float local_density = 0.f;
@@ -146,8 +146,13 @@ inline int fuse(int start_col, int end_col, const t_param params,
               buffer.speeds[8] = cells[ii + jj * params.nx].speeds[6];
             }
             if (ii == 0 || jj == 0 || ii == params.nx - 1 ||
-                jj == params.ny - 1)
+                jj == params.ny - 1) {
               memcpy(&cells[ii + jj * params.nx], &buffer, sizeof(buffer));
+              y_n = ((jj + 1) >= params.ny) ? 0 : jj + 1;
+              x_e = ((ii + 1) >= params.nx) ? 0 : ii + 1;
+              y_s = (jj == 0) ? (params.ny - 1) : (jj - 1);
+              x_w = (ii == 0) ? (params.nx - 1) : (ii - 1);
+            }
             /* propagate densities from neighbouring cells, following
             ** appropriate directions of travel and writing into
             ** scratch space grid */
