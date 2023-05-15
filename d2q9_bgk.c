@@ -37,8 +37,8 @@ int timestep(const t_param params, t_speed *cells, t_speed *tmp_cells,
 ** the local equilibrium distribution and relaxation process
 */
 
-#define chunk_x 128
-#define chunk_y 16
+#define chunk_x 256
+#define chunk_y 2
 t_speed buffer[chunk_y][chunk_x];
 inline int fuse(int start_col, int end_col, const t_param params,
                 t_speed *cells, t_speed *tmp_cells, int *obstacles) {
