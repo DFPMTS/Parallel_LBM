@@ -177,6 +177,9 @@ int collision(int start_col, int end_col, const t_param params, t_speed *cells,
   static const float w1 = 1.f / 9.f;   /* weighting factor */
   static const float w2 = 1.f / 36.f;  /* weighting factor */
 
+  if (params.ny == 512)
+    chunk_y = 512;
+
   /* loop over the cells in the grid
   ** the collision step is called before
   ** the streaming step and so values of interest
@@ -187,7 +190,7 @@ int collision(int start_col, int end_col, const t_param params, t_speed *cells,
   __m256 w = _mm256_setr_ps(w1, w1, w1, w1, w2, w2, w2, w2);
   __m256 omega = _mm256_set1_ps(params.omega);
 
-#pragma omp parallel for
+#pragma omp parallel for static
   for (int i = start_col; i < end_col; i += chunk_x) {
     for (int j = 0; j < params.ny; j += chunk_y) {
       for (int jj = j; jj < j + chunk_y; jj++) {
