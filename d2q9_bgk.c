@@ -40,6 +40,136 @@ int timestep(const t_param params, t_speed *cells, t_speed *tmp_cells,
 
 #define chunk_x 64
 #define chunk_y 64
+inline int fuse(int start_col, int end_col, const t_param params,
+                t_speed *cells, t_speed *tmp_cells, int *obstacles) {
+  static const float c_sq = 1.f / 3.f; /* square of speed of sound */
+  static const float w0 = 4.f / 9.f;   /* weighting factor */
+  static const float w1 = 1.f / 9.f;   /* weighting factor */
+  static const float w2 = 1.f / 36.f;  /* weighting factor */
+
+  /* loop over the cells in the grid
+  ** the collision step is called before
+  ** the streaming step and so values of interest
+  ** are in the scratch-space grid */
+  __m256 _1 = _mm256_set1_ps(1.f);
+  __m256 c = _mm256_set1_ps(c_sq);
+  __m256 _2_c_c = _mm256_set1_ps(2.f * c_sq * c_sq);
+  __m256 w = _mm256_setr_ps(w1, w1, w1, w1, w2, w2, w2, w2);
+  __m256 omega = _mm256_set1_ps(params.omega);
+
+#pragma omp parallel for
+  for (int i = start_col; i < end_col; i += chunk_x) {
+    t_speed buffer;
+    for (int j = 0; j < params.ny; j += chunk_y)
+      for (int jj = j; jj < j + chunk_y; jj++) {
+        for (int ii = i; ii < i + chunk_x; ii++) {
+          int y_n = jj + 1;
+          int x_e = ii + 1;
+          int y_s = jj - 1;
+          int x_w = ii - 1;
+          if (!obstacles[ii + jj * params.nx]) {
+            /* compute local density total */
+            float local_density = 0.f;
+
+            for (int kk = 0; kk < NSPEEDS; kk++) {
+              local_density += cells[ii + jj * params.nx].speeds[kk];
+            }
+
+            /* compute x velocity component */
+            float u_x = (cells[ii + jj * params.nx].speeds[1] +
+                         cells[ii + jj * params.nx].speeds[5] +
+                         cells[ii + jj * params.nx].speeds[8] -
+                         (cells[ii + jj * params.nx].speeds[3] +
+                          cells[ii + jj * params.nx].speeds[6] +
+                          cells[ii + jj * params.nx].speeds[7])) /
+                        local_density;
+            /* compute y velocity component */
+            float u_y = (cells[ii + jj * params.nx].speeds[2] +
+                         cells[ii + jj * params.nx].speeds[5] +
+                         cells[ii + jj * params.nx].speeds[6] -
+                         (cells[ii + jj * params.nx].speeds[4] +
+                          cells[ii + jj * params.nx].speeds[7] +
+                          cells[ii + jj * params.nx].speeds[8])) /
+                        local_density;
+
+            /* velocity squared */
+            float u_sq = u_x * u_x + u_y * u_y;
+
+            /* equilibrium densities */
+            float d_equ;
+            /* zero velocity density: weight w0 */
+
+            d_equ = w0 * local_density * (1.f - u_sq / (2.f * c_sq));
+
+            __m256 x = _mm256_setr_ps(u_x, u_y, -u_x, -u_y, u_x + u_y,
+                                      -u_x + u_y, -u_x - u_y, u_x - u_y);
+
+            __m256 res = _mm256_add_ps(
+                _mm256_add_ps(_1, _mm256_div_ps(x, c)),
+                _mm256_sub_ps(_mm256_div_ps(_mm256_mul_ps(x, x),
+                                            _mm256_set1_ps(2.f * c_sq * c_sq)),
+                              _mm256_set1_ps(u_sq / (2.f * c_sq))));
+            res =
+                _mm256_mul_ps(_mm256_mul_ps(res, _mm256_set1_ps(local_density)),
+                              _mm256_setr_ps(w1, w1, w1, w1, w2, w2, w2, w2));
+            /* relaxation step */
+            buffer.speeds[0] =
+                cells[ii + jj * params.nx].speeds[0] +
+                params.omega * (d_equ - cells[ii + jj * params.nx].speeds[0]);
+            __m256 c_s = _mm256_loadu_ps(cells[ii + jj * params.nx].speeds + 1);
+            res = _mm256_add_ps(_mm256_mul_ps(_mm256_sub_ps(res, c_s), omega),
+                                c_s);
+            _mm256_storeu_ps(buffer.speeds + 1, res);
+          } else {
+            buffer.speeds[0] = cells[ii + jj * params.nx].speeds[0];
+            buffer.speeds[1] = cells[ii + jj * params.nx].speeds[3];
+            buffer.speeds[2] = cells[ii + jj * params.nx].speeds[4];
+            buffer.speeds[3] = cells[ii + jj * params.nx].speeds[1];
+            buffer.speeds[4] = cells[ii + jj * params.nx].speeds[2];
+            buffer.speeds[5] = cells[ii + jj * params.nx].speeds[7];
+            buffer.speeds[6] = cells[ii + jj * params.nx].speeds[8];
+            buffer.speeds[7] = cells[ii + jj * params.nx].speeds[5];
+            buffer.speeds[8] = cells[ii + jj * params.nx].speeds[6];
+          }
+          if (ii == 0 || jj == 0 || ii == params.nx - 1 ||
+              jj == params.ny - 1) {
+            memcpy(&cells[ii + jj * params.nx], &buffer, sizeof(buffer));
+            if ((jj + 1) >= params.ny)
+              y_n = 0;
+            if ((ii + 1) >= params.nx)
+              x_e = 0;
+            if (jj == 0)
+              y_s = params.ny - 1;
+            if (ii == 0)
+              x_w = params.nx - 1;
+          }
+          /* propagate densities from neighbouring cells, following
+          ** appropriate directions of travel and writing into
+          ** scratch space grid */
+          tmp_cells[ii + jj * params.nx].speeds[0] =
+              buffer.speeds[0]; /* central cell, no movement */
+          tmp_cells[x_e + jj * params.nx].speeds[1] =
+              buffer.speeds[1]; /* east */
+          tmp_cells[ii + y_n * params.nx].speeds[2] =
+              buffer.speeds[2]; /* north */
+          tmp_cells[x_w + jj * params.nx].speeds[3] =
+              buffer.speeds[3]; /* west */
+          tmp_cells[ii + y_s * params.nx].speeds[4] =
+              buffer.speeds[4]; /* south */
+          tmp_cells[x_e + y_n * params.nx].speeds[5] =
+              buffer.speeds[5]; /* north-east */
+          tmp_cells[x_w + y_n * params.nx].speeds[6] =
+              buffer.speeds[6]; /* north-west */
+          tmp_cells[x_w + y_s * params.nx].speeds[7] =
+              buffer.speeds[7]; /* south-west */
+          tmp_cells[x_e + y_s * params.nx].speeds[8] =
+              buffer.speeds[8]; /* south-east */
+        }
+      }
+  }
+
+  return EXIT_SUCCESS;
+}
 
 int collision(int start_col, int end_col, const t_param params, t_speed *cells,
               t_speed *tmp_cells, int *obstacles) {
