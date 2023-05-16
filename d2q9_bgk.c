@@ -65,10 +65,10 @@ inline int fuse(int start_col, int end_col, const t_param params,
     t_speed buffer;
     for (int j = 0; j < params.ny; j += chunk_y)
       for (int jj = j; jj < j + chunk_y; jj++) {
+        int y_n = jj + 1;
+        int y_s = jj - 1;
         for (int ii = i; ii < i + chunk_x; ii++) {
-          int y_n = jj + 1;
           int x_e = ii + 1;
-          int y_s = jj - 1;
           int x_w = ii - 1;
           if (!obstacles[ii + jj * params.nx]) {
             /* compute local density total */
