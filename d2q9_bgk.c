@@ -177,9 +177,6 @@ int collision(int start_col, int end_col, const t_param params, t_speed *cells,
   static const float w1 = 1.f / 9.f;   /* weighting factor */
   static const float w2 = 1.f / 36.f;  /* weighting factor */
 
-  if (params.ny == 512)
-    chunk_y = 512;
-
   /* loop over the cells in the grid
   ** the collision step is called before
   ** the streaming step and so values of interest
