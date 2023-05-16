@@ -38,8 +38,8 @@ int timestep(const t_param params, t_speed *cells, t_speed *tmp_cells,
 ** the local equilibrium distribution and relaxation process
 */
 
-#define chunk_x 64
-#define chunk_y 64
+#define chunk_x 128
+#define chunk_y 128
 inline int fuse(int start_col, int end_col, const t_param params,
                 t_speed *cells, t_speed *tmp_cells, int *obstacles) {
   static const float c_sq = 1.f / 3.f; /* square of speed of sound */
