@@ -187,9 +187,10 @@ int collision(int start_col, int end_col, const t_param params, t_speed *cells,
   __m256 w = _mm256_setr_ps(w1, w1, w1, w1, w2, w2, w2, w2);
   __m256 omega = _mm256_set1_ps(params.omega);
 
-#pragma omp parallel for schedule(static)
-  for (int ii = start_col; ii < end_col; ii++) {
-    for (int j = 0; j < params.ny; j += chunk_y) {
+  for (int j = 0; j < params.ny; j += chunk_y) {
+#pragma omp parallel for
+    for (int ii = start_col; ii < end_col; ii++) {
+
       for (int jj = j; jj < j + chunk_y; jj++) {
         if (!obstacles[ii * params.ny + jj]) {
           /* compute local density total */
