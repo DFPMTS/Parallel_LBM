@@ -65,8 +65,8 @@ inline int fuse(int start_col, int end_col, const t_param params,
     t_speed buffer;
     for (int j = 0; j < params.ny; j += chunk_y)
       for (int jj = j; jj < j + chunk_y; jj++) {
-        int y_n = jj + 1;
-        int y_s = jj - 1;
+        int y_n = ((jj + 1) == params.ny) ? 0 : jj + 1;
+        int y_s = (jj == 0) ? params.ny - 1 : jj - 1;
         for (int ii = i; ii < i + chunk_x; ii++) {
           int x_e = ii + 1;
           int x_w = ii - 1;
@@ -137,12 +137,8 @@ inline int fuse(int start_col, int end_col, const t_param params,
           if (ii == 0 || jj == 0 || ii == params.nx - 1 ||
               jj == params.ny - 1) {
             memcpy(&cells[ii + jj * params.nx], &buffer, sizeof(buffer));
-            if ((jj + 1) >= params.ny)
-              y_n = 0;
             if ((ii + 1) >= params.nx)
               x_e = 0;
-            if (jj == 0)
-              y_s = params.ny - 1;
             if (ii == 0)
               x_w = params.nx - 1;
           }
