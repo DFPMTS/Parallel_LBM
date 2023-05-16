@@ -38,8 +38,8 @@ int timestep(const t_param params, t_speed *cells, t_speed *tmp_cells,
 ** the local equilibrium distribution and relaxation process
 */
 
-#define chunk_x 256
-#define chunk_y 128
+int chunk_x = 128;
+int chunk_y = 128;
 inline int fuse(int start_col, int end_col, const t_param params,
                 t_speed *cells, t_speed *tmp_cells, int *obstacles) {
   static const float c_sq = 1.f / 3.f; /* square of speed of sound */
@@ -56,6 +56,9 @@ inline int fuse(int start_col, int end_col, const t_param params,
   __m256 _2_c_c = _mm256_set1_ps(2.f * c_sq * c_sq);
   __m256 w = _mm256_setr_ps(w1, w1, w1, w1, w2, w2, w2, w2);
   __m256 omega = _mm256_set1_ps(params.omega);
+
+  if (params.ny == 512)
+    chunk_y = 512;
 
 #pragma omp parallel for
   for (int i = start_col; i < end_col; i += chunk_x) {
