@@ -149,38 +149,11 @@ int streaming(int start_col, int end_col, const t_param params, t_speed *cells,
     int ii_start = i, ii_end = ((i + chunk_x) > (params.nx - 1))
                                    ? (params.nx - 1)
                                    : (i + chunk_x);
-    int jj = 0;
-    int y_s = jj + 1;
-    int y_n = params.ny - 1;
+    int y_s = 0;
+    int y_n = 0;
     int x_w = 0;
     int x_e = 0;
-    for (int ii = ii_start; ii < ii_end; ii++) {
-      x_w = ii + 1;
-      x_e = ii - 1;
-      // ! stream
-      cells[ii + jj * params.nx].speeds[0] =
-          tmp_cells[ii + jj * params.nx]
-              .speeds[0]; /* central cell, no movement */
-      cells[ii + jj * params.nx].speeds[1] =
-          tmp_cells[x_e + jj * params.nx].speeds[1]; /* east */
 
-      cells[ii + jj * params.nx].speeds[3] =
-          tmp_cells[x_w + jj * params.nx].speeds[3]; /* west */
-      cells[ii + jj * params.nx].speeds[4] =
-          tmp_cells[ii + y_s * params.nx].speeds[4]; /* south */
-
-      cells[ii + jj * params.nx].speeds[7] =
-          tmp_cells[x_w + y_s * params.nx].speeds[7]; /* south-west */
-      cells[ii + jj * params.nx].speeds[8] =
-          tmp_cells[x_e + y_s * params.nx].speeds[8]; /* south-east */
-      // ! boundry
-      cells[ii + jj * params.nx].speeds[2] =
-          tmp_cells[ii + jj * params.nx].speeds[4];
-      cells[ii + jj * params.nx].speeds[5] =
-          tmp_cells[ii + jj * params.nx].speeds[7];
-      cells[ii + jj * params.nx].speeds[6] =
-          tmp_cells[ii + jj * params.nx].speeds[8];
-    }
     for (int jj = 1; jj < params.ny - 1; jj++) {
       y_s = jj + 1;
       y_n = jj - 1;
@@ -211,36 +184,71 @@ int streaming(int start_col, int end_col, const t_param params, t_speed *cells,
             tmp_cells[x_e + y_s * params.nx].speeds[8]; /* south-east */
       }
     }
-    jj = params.ny - 1;
-    y_s = 0;
-    y_n = jj - 1;
-    for (int ii = ii_start; ii < ii_end; ii++) {
-      x_w = ii + 1;
-      x_e = ii - 1;
-      // ! stream
-      cells[ii + jj * params.nx].speeds[0] =
-          tmp_cells[ii + jj * params.nx]
-              .speeds[0]; /* central cell, no movement */
-      cells[ii + jj * params.nx].speeds[1] =
-          tmp_cells[x_e + jj * params.nx].speeds[1]; /* east */
-      cells[ii + jj * params.nx].speeds[2] =
-          tmp_cells[ii + y_n * params.nx].speeds[2]; /* north */
-      cells[ii + jj * params.nx].speeds[3] =
-          tmp_cells[x_w + jj * params.nx].speeds[3]; /* west */
+  }
+  int jj = 0;
+  int y_s = jj + 1;
+  int y_n = params.ny - 1;
+  int x_w = 0;
+  int x_e = 0;
+#pragma omp parallel for
+  for (int ii = 1; ii < params.nx - 1; ii++) {
+    x_w = ii + 1;
+    x_e = ii - 1;
+    // ! stream
+    cells[ii + jj * params.nx].speeds[0] =
+        tmp_cells[ii + jj * params.nx]
+            .speeds[0]; /* central cell, no movement */
+    cells[ii + jj * params.nx].speeds[1] =
+        tmp_cells[x_e + jj * params.nx].speeds[1]; /* east */
 
-      cells[ii + jj * params.nx].speeds[5] =
-          tmp_cells[x_e + y_n * params.nx].speeds[5]; /* north-east */
-      cells[ii + jj * params.nx].speeds[6] =
-          tmp_cells[x_w + y_n * params.nx].speeds[6]; /* north-west */
+    cells[ii + jj * params.nx].speeds[3] =
+        tmp_cells[x_w + jj * params.nx].speeds[3]; /* west */
+    cells[ii + jj * params.nx].speeds[4] =
+        tmp_cells[ii + y_s * params.nx].speeds[4]; /* south */
 
-      // ! boundry
-      cells[ii + jj * params.nx].speeds[4] =
-          tmp_cells[ii + jj * params.nx].speeds[2];
-      cells[ii + jj * params.nx].speeds[7] =
-          tmp_cells[ii + jj * params.nx].speeds[5];
-      cells[ii + jj * params.nx].speeds[8] =
-          tmp_cells[ii + jj * params.nx].speeds[6];
-    }
+    cells[ii + jj * params.nx].speeds[7] =
+        tmp_cells[x_w + y_s * params.nx].speeds[7]; /* south-west */
+    cells[ii + jj * params.nx].speeds[8] =
+        tmp_cells[x_e + y_s * params.nx].speeds[8]; /* south-east */
+    // ! boundry
+    cells[ii + jj * params.nx].speeds[2] =
+        tmp_cells[ii + jj * params.nx].speeds[4];
+    cells[ii + jj * params.nx].speeds[5] =
+        tmp_cells[ii + jj * params.nx].speeds[7];
+    cells[ii + jj * params.nx].speeds[6] =
+        tmp_cells[ii + jj * params.nx].speeds[8];
+  }
+
+  jj = params.ny - 1;
+  y_s = 0;
+  y_n = jj - 1;
+#pragma omp parallel for
+  for (int ii = 1; ii < params.nx - 1; ii++) {
+    x_w = ii + 1;
+    x_e = ii - 1;
+    // ! stream
+    cells[ii + jj * params.nx].speeds[0] =
+        tmp_cells[ii + jj * params.nx]
+            .speeds[0]; /* central cell, no movement */
+    cells[ii + jj * params.nx].speeds[1] =
+        tmp_cells[x_e + jj * params.nx].speeds[1]; /* east */
+    cells[ii + jj * params.nx].speeds[2] =
+        tmp_cells[ii + y_n * params.nx].speeds[2]; /* north */
+    cells[ii + jj * params.nx].speeds[3] =
+        tmp_cells[x_w + jj * params.nx].speeds[3]; /* west */
+
+    cells[ii + jj * params.nx].speeds[5] =
+        tmp_cells[x_e + y_n * params.nx].speeds[5]; /* north-east */
+    cells[ii + jj * params.nx].speeds[6] =
+        tmp_cells[x_w + y_n * params.nx].speeds[6]; /* north-west */
+
+    // ! boundry
+    cells[ii + jj * params.nx].speeds[4] =
+        tmp_cells[ii + jj * params.nx].speeds[2];
+    cells[ii + jj * params.nx].speeds[7] =
+        tmp_cells[ii + jj * params.nx].speeds[5];
+    cells[ii + jj * params.nx].speeds[8] =
+        tmp_cells[ii + jj * params.nx].speeds[6];
   }
 
   int ii = 0;
