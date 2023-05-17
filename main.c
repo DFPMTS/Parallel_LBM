@@ -82,16 +82,23 @@ int main(int argc, char *argv[]) {
   comp_time = timstr.tv_sec + (timstr.tv_usec / 1000000.0);
 
   /* timestep loop */
-  for (int tt = 0; tt < params.maxIters; tt++) {
+  timestep_begin(params, cells, tmp_cells, inlets, obstacles);
+  t_speed *tmp;
+  for (int tt = 0; tt < params.maxIters - 1; tt++) {
     timestep(params, cells, tmp_cells, inlets, obstacles);
+    tmp = cells;
+    cells = tmp_cells;
+    tmp_cells = tmp;
     /* Visualization */
 #ifdef VISUAL
     if (tt % 1000 == 0) {
       sprintf(buf, "%s/visual/state_%d.dat", out_dir, tt / 1000);
       write_state(buf, params, cells, obstacles);
     }
+
 #endif
   }
+  timestep_end(params, cells, tmp_cells, inlets, obstacles);
 
   /* Compute time stops here */
   gettimeofday(&timstr, NULL);

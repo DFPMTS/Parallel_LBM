@@ -49,4 +49,8 @@
 
 int timestep(const t_param params, t_speed *cells, t_speed *tmp_cells,
              float *inlets, int *obstacles);
+int timestep_begin(const t_param params, t_speed *cells, t_speed *tmp_cells,
+                   float *inlets, int *obstacles);
+int timestep_end(const t_param params, t_speed *cells, t_speed *tmp_cells,
+                 float *inlets, int *obstacles);
 #endif
