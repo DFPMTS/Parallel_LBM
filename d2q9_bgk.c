@@ -310,7 +310,7 @@ int streaming(int start_col, int end_col, const t_param params, t_speed *cells,
 #pragma omp parallel for
   for (int i = start_col; i < end_col; i += chunk_x) {
     for (int j = 0; j < params.ny; j += chunk_y) {
-      for (int jj = 0; jj < params.ny; jj++) {
+      for (int jj = j; jj < j + chunk_y; jj++) {
         for (int ii = i; ii < i + chunk_x; ii++) {
           int y_s = ((jj + 1) >= params.ny) ? 0 : jj + 1;
           int x_w = ((ii + 1) >= params.nx) ? 0 : ii + 1;
