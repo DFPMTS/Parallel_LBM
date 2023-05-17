@@ -146,36 +146,35 @@ int streaming(int start_col, int end_col, const t_param params, t_speed *cells,
 
 #pragma omp parallel for
   for (int i = start_col; i < end_col; i += chunk_x) {
-    for (int j = 0; j < params.ny; j += chunk_y) {
-      for (int jj = j; jj < j + chunk_y; jj++) {
-        for (int ii = i; ii < i + chunk_x; ii++) {
-          int y_s = ((jj + 1) >= params.ny) ? 0 : jj + 1;
-          int x_w = ((ii + 1) >= params.nx) ? 0 : ii + 1;
-          int y_n = (jj == 0) ? (params.ny - 1) : (jj - 1);
-          int x_e = (ii == 0) ? (params.nx - 1) : (ii - 1);
-          /* propagate densities from neighbouring cells, following
-          ** appropriate directions of travel and writing into
-          ** scratch space grid */
-          cells[ii + jj * params.nx].speeds[0] =
-              tmp_cells[ii + jj * params.nx]
-                  .speeds[0]; /* central cell, no movement */
-          cells[ii + jj * params.nx].speeds[1] =
-              tmp_cells[x_e + jj * params.nx].speeds[1]; /* east */
-          cells[ii + jj * params.nx].speeds[2] =
-              tmp_cells[ii + y_n * params.nx].speeds[2]; /* north */
-          cells[ii + jj * params.nx].speeds[3] =
-              tmp_cells[x_w + jj * params.nx].speeds[3]; /* west */
-          cells[ii + jj * params.nx].speeds[4] =
-              tmp_cells[ii + y_s * params.nx].speeds[4]; /* south */
-          cells[ii + jj * params.nx].speeds[5] =
-              tmp_cells[x_e + y_n * params.nx].speeds[5]; /* north-east */
-          cells[ii + jj * params.nx].speeds[6] =
-              tmp_cells[x_w + y_n * params.nx].speeds[6]; /* north-west */
-          cells[ii + jj * params.nx].speeds[7] =
-              tmp_cells[x_w + y_s * params.nx].speeds[7]; /* south-west */
-          cells[ii + jj * params.nx].speeds[8] =
-              tmp_cells[x_e + y_s * params.nx].speeds[8]; /* south-east */
-        }
+    // for (int j = 0; j < params.ny; j += chunk_y) {
+    for (int jj = 0; jj < params.ny; jj++) {
+      for (int ii = i; ii < i + chunk_x; ii++) {
+        int y_s = ((jj + 1) >= params.ny) ? 0 : jj + 1;
+        int x_w = ((ii + 1) >= params.nx) ? 0 : ii + 1;
+        int y_n = (jj == 0) ? (params.ny - 1) : (jj - 1);
+        int x_e = (ii == 0) ? (params.nx - 1) : (ii - 1);
+        /* propagate densities from neighbouring cells, following
+        ** appropriate directions of travel and writing into
+        ** scratch space grid */
+        cells[ii + jj * params.nx].speeds[0] =
+            tmp_cells[ii + jj * params.nx]
+                .speeds[0]; /* central cell, no movement */
+        cells[ii + jj * params.nx].speeds[1] =
+            tmp_cells[x_e + jj * params.nx].speeds[1]; /* east */
+        cells[ii + jj * params.nx].speeds[2] =
+            tmp_cells[ii + y_n * params.nx].speeds[2]; /* north */
+        cells[ii + jj * params.nx].speeds[3] =
+            tmp_cells[x_w + jj * params.nx].speeds[3]; /* west */
+        cells[ii + jj * params.nx].speeds[4] =
+            tmp_cells[ii + y_s * params.nx].speeds[4]; /* south */
+        cells[ii + jj * params.nx].speeds[5] =
+            tmp_cells[x_e + y_n * params.nx].speeds[5]; /* north-east */
+        cells[ii + jj * params.nx].speeds[6] =
+            tmp_cells[x_w + y_n * params.nx].speeds[6]; /* north-west */
+        cells[ii + jj * params.nx].speeds[7] =
+            tmp_cells[x_w + y_s * params.nx].speeds[7]; /* south-west */
+        cells[ii + jj * params.nx].speeds[8] =
+            tmp_cells[x_e + y_s * params.nx].speeds[8]; /* south-east */
       }
     }
   }
