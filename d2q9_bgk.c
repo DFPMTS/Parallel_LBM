@@ -8,7 +8,7 @@
 int collision(int start_col, int end_col, const t_param params, t_speed *cells,
               t_speed *tmp_cells, int *obstacles);
 int streaming(int start_col, int end_col, const t_param params, t_speed *cells,
-              t_speed *tmp_cells);
+              t_speed *tmp_cells, float *inlets);
 int obstacle(const t_param params, t_speed *cells, t_speed *tmp_cells,
              int *obstacles);
 int boundary(const t_param params, t_speed *cells, t_speed *tmp_cells,
@@ -26,9 +26,9 @@ int timestep(const t_param params, t_speed *cells, t_speed *tmp_cells,
   /* The main time overhead, you should mainly optimize these processes. */
 
   collision(0, params.nx, params, cells, tmp_cells, obstacles);
-  streaming(0, params.nx, params, cells, tmp_cells);
+  streaming(0, params.nx, params, cells, tmp_cells, inlets);
 
-  boundary(params, cells, tmp_cells, inlets);
+  // boundary(params, cells, tmp_cells, inlets);
 
   return EXIT_SUCCESS;
 }
@@ -141,7 +141,7 @@ int collision(int start_col, int end_col, const t_param params, t_speed *cells,
 *direaction.
 */
 int streaming(int start_col, int end_col, const t_param params, t_speed *cells,
-              t_speed *tmp_cells) {
+              t_speed *tmp_cells, float *inlets) {
   /* loop over _all_ cells */
 
 #pragma omp parallel for
@@ -251,13 +251,19 @@ int streaming(int start_col, int end_col, const t_param params, t_speed *cells,
         tmp_cells[ii + jj * params.nx].speeds[6];
   }
 
+  const float cst1 = 2.0 / 3.0;
+  const float cst2 = 1.0 / 6.0;
+  const float cst3 = 1.0 / 2.0;
+
+  float local_density;
+
   int ii = 0;
 #pragma omp parallel for
   for (int jj = 0; jj < params.ny; ++jj) {
-    int y_s = (jj + 1) >= params.ny ? 0 : (jj + 1);
-    int y_n = (jj - 1) < 0 ? params.ny - 1 : (jj - 1);
-    int x_w = ii + 1;
-    int x_e = params.nx - 1;
+    y_s = (jj + 1) >= params.ny ? 0 : (jj + 1);
+    y_n = (jj - 1) < 0 ? params.ny - 1 : (jj - 1);
+    x_w = ii + 1;
+    x_e = params.nx - 1;
     cells[ii + jj * params.nx].speeds[0] =
         tmp_cells[ii + jj * params.nx]
             .speeds[0]; /* central cell, no movement */
@@ -277,15 +283,39 @@ int streaming(int start_col, int end_col, const t_param params, t_speed *cells,
         tmp_cells[x_w + y_s * params.nx].speeds[7]; /* south-west */
     cells[ii + jj * params.nx].speeds[8] =
         tmp_cells[x_e + y_s * params.nx].speeds[8]; /* south-east */
+
+    local_density = (cells[ii + jj * params.nx].speeds[0] +
+                     cells[ii + jj * params.nx].speeds[2] +
+                     cells[ii + jj * params.nx].speeds[4] +
+                     2.0 * cells[ii + jj * params.nx].speeds[3] +
+                     2.0 * cells[ii + jj * params.nx].speeds[6] +
+                     2.0 * cells[ii + jj * params.nx].speeds[7]) /
+                    (1.0 - inlets[jj]);
+
+    cells[ii + jj * params.nx].speeds[1] =
+        cells[ii + jj * params.nx].speeds[3] +
+        cst1 * local_density * inlets[jj];
+
+    cells[ii + jj * params.nx].speeds[5] =
+        cells[ii + jj * params.nx].speeds[7] -
+        cst3 * (cells[ii + jj * params.nx].speeds[2] -
+                cells[ii + jj * params.nx].speeds[4]) +
+        cst2 * local_density * inlets[jj];
+
+    cells[ii + jj * params.nx].speeds[8] =
+        cells[ii + jj * params.nx].speeds[6] +
+        cst3 * (cells[ii + jj * params.nx].speeds[2] -
+                cells[ii + jj * params.nx].speeds[4]) +
+        cst2 * local_density * inlets[jj];
   }
 
   ii = params.nx - 1;
 #pragma omp parallel for
   for (int jj = 0; jj < params.ny; ++jj) {
-    int y_s = (jj + 1) >= params.ny ? 0 : (jj + 1);
-    int y_n = (jj - 1) < 0 ? params.ny - 1 : (jj - 1);
-    int x_w = ii - 1;
-    int x_e = 0;
+    y_s = (jj + 1) >= params.ny ? 0 : (jj + 1);
+    y_n = (jj - 1) < 0 ? params.ny - 1 : (jj - 1);
+    x_w = ii - 1;
+    x_e = 0;
     cells[ii + jj * params.nx].speeds[0] =
         tmp_cells[ii + jj * params.nx]
             .speeds[0]; /* central cell, no movement */
@@ -305,6 +335,11 @@ int streaming(int start_col, int end_col, const t_param params, t_speed *cells,
         tmp_cells[x_w + y_s * params.nx].speeds[7]; /* south-west */
     cells[ii + jj * params.nx].speeds[8] =
         tmp_cells[x_e + y_s * params.nx].speeds[8]; /* south-east */
+
+    for (int kk = 0; kk < NSPEEDS; kk++) {
+      cells[ii + jj * params.nx].speeds[kk] =
+          cells[ii - 1 + jj * params.nx].speeds[kk];
+    }
   }
 
   return EXIT_SUCCESS;
