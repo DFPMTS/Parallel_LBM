@@ -114,11 +114,10 @@ int collision(int start_col, int end_col, const t_param params, t_speed *cells,
 
         __m256 res = _mm256_add_ps(
             _mm256_add_ps(_1, _mm256_div_ps(x, c)),
-            _mm256_sub_ps(_mm256_div_ps(_mm256_mul_ps(x, x),
-                                        _mm256_set1_ps(2.f * c_sq * c_sq)),
+            _mm256_sub_ps(_mm256_div_ps(_mm256_mul_ps(x, x), _2_c_c),
                           _mm256_set1_ps(u_sq / (2.f * c_sq))));
-        res = _mm256_mul_ps(_mm256_mul_ps(res, _mm256_set1_ps(local_density)),
-                            _mm256_setr_ps(w1, w1, w1, w1, w2, w2, w2, w2));
+        res =
+            _mm256_mul_ps(_mm256_mul_ps(res, _mm256_set1_ps(local_density)), w);
         /* relaxation step */
         tmp_cells[ii + jj * params.nx].speeds[0] =
             cells[ii + jj * params.nx].speeds[0] +
