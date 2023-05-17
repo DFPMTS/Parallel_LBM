@@ -8,15 +8,14 @@
 /* The main processes in one step */
 int collision(int start_col, int end_col, const t_param params, t_speed *cells,
               t_speed *tmp_cells, int *obstacles);
-inline int streaming(int start_col, int end_col, const t_param params,
-                     t_speed *cells, t_speed *tmp_cells);
+int streaming(int start_col, int end_col, const t_param params, t_speed *cells,
+              t_speed *tmp_cells);
 int obstacle(const t_param params, t_speed *cells, t_speed *tmp_cells,
              int *obstacles);
 int boundary(const t_param params, t_speed *cells, t_speed *tmp_cells,
              float *inlets);
-inline int fuse(int start_col, int end_col, const t_param params,
-                t_speed *cells, t_speed *tmp_cells, float *inlets,
-                int *obstacles);
+int fuse(int start_col, int end_col, const t_param params, t_speed *cells,
+         t_speed *tmp_cells, float *inlets, int *obstacles);
 
 /*
 ** The main calculation methods.
