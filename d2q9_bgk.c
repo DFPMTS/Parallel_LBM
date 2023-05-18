@@ -59,79 +59,61 @@ int collision(int start_col, int end_col, const t_param params, t_speed *cells,
   __m256 omega = _mm256_set1_ps(params.omega);
 
 #pragma omp parallel for
-  for (int jj = 0; jj < params.ny; jj++) {
-    for (int ii = 0; ii < params.nx; ii++) {
-      if (!obstacles[ii + jj * params.nx]) {
-        /* compute local density total */
-        float local_density = 0.f;
+  for (int ii = 0; ii < params.ny * params.nx; ii++) {
+    if (!obstacles[ii]) {
+      /* compute local density total */
+      float local_density = 0.f;
 
-        for (int kk = 0; kk < NSPEEDS; kk++) {
-          local_density += cells[ii + jj * params.nx].speeds[kk];
-        }
-
-        /* compute x velocity component */
-        float u_x = (cells[ii + jj * params.nx].speeds[1] +
-                     cells[ii + jj * params.nx].speeds[5] +
-                     cells[ii + jj * params.nx].speeds[8] -
-                     (cells[ii + jj * params.nx].speeds[3] +
-                      cells[ii + jj * params.nx].speeds[6] +
-                      cells[ii + jj * params.nx].speeds[7])) /
-                    local_density;
-        /* compute y velocity component */
-        float u_y = (cells[ii + jj * params.nx].speeds[2] +
-                     cells[ii + jj * params.nx].speeds[5] +
-                     cells[ii + jj * params.nx].speeds[6] -
-                     (cells[ii + jj * params.nx].speeds[4] +
-                      cells[ii + jj * params.nx].speeds[7] +
-                      cells[ii + jj * params.nx].speeds[8])) /
-                    local_density;
-
-        /* velocity squared */
-        float u_sq = u_x * u_x + u_y * u_y;
-
-        /* equilibrium densities */
-        float d_equ;
-        /* zero velocity density: weight w0 */
-
-        d_equ = w0 * local_density * (1.f - u_sq / (2.f * c_sq));
-
-        __m256 x = _mm256_setr_ps(u_x, u_y, -u_x, -u_y, u_x + u_y, -u_x + u_y,
-                                  -u_x - u_y, u_x - u_y);
-
-        __m256 res = _mm256_add_ps(
-            _mm256_add_ps(_1, _mm256_div_ps(x, c)),
-            _mm256_sub_ps(_mm256_div_ps(_mm256_mul_ps(x, x),
-                                        _mm256_set1_ps(2.f * c_sq * c_sq)),
-                          _mm256_set1_ps(u_sq / (2.f * c_sq))));
-        res = _mm256_mul_ps(_mm256_mul_ps(res, _mm256_set1_ps(local_density)),
-                            _mm256_setr_ps(w1, w1, w1, w1, w2, w2, w2, w2));
-        /* relaxation step */
-        tmp_cells[ii + jj * params.nx].speeds[0] =
-            cells[ii + jj * params.nx].speeds[0] +
-            params.omega * (d_equ - cells[ii + jj * params.nx].speeds[0]);
-        __m256 c_s = _mm256_loadu_ps(cells[ii + jj * params.nx].speeds + 1);
-        res = _mm256_add_ps(_mm256_mul_ps(_mm256_sub_ps(res, c_s), omega), c_s);
-        _mm256_storeu_ps(tmp_cells[ii + jj * params.nx].speeds + 1, res);
-      } else {
-        tmp_cells[ii + jj * params.nx].speeds[0] =
-            cells[ii + jj * params.nx].speeds[0];
-        tmp_cells[ii + jj * params.nx].speeds[1] =
-            cells[ii + jj * params.nx].speeds[3];
-        tmp_cells[ii + jj * params.nx].speeds[2] =
-            cells[ii + jj * params.nx].speeds[4];
-        tmp_cells[ii + jj * params.nx].speeds[3] =
-            cells[ii + jj * params.nx].speeds[1];
-        tmp_cells[ii + jj * params.nx].speeds[4] =
-            cells[ii + jj * params.nx].speeds[2];
-        tmp_cells[ii + jj * params.nx].speeds[5] =
-            cells[ii + jj * params.nx].speeds[7];
-        tmp_cells[ii + jj * params.nx].speeds[6] =
-            cells[ii + jj * params.nx].speeds[8];
-        tmp_cells[ii + jj * params.nx].speeds[7] =
-            cells[ii + jj * params.nx].speeds[5];
-        tmp_cells[ii + jj * params.nx].speeds[8] =
-            cells[ii + jj * params.nx].speeds[6];
+      for (int kk = 0; kk < NSPEEDS; kk++) {
+        local_density += cells[ii].speeds[kk];
       }
+
+      /* compute x velocity component */
+      float u_x =
+          (cells[ii].speeds[1] + cells[ii].speeds[5] + cells[ii].speeds[8] -
+           (cells[ii].speeds[3] + cells[ii].speeds[6] + cells[ii].speeds[7])) /
+          local_density;
+      /* compute y velocity component */
+      float u_y =
+          (cells[ii].speeds[2] + cells[ii].speeds[5] + cells[ii].speeds[6] -
+           (cells[ii].speeds[4] + cells[ii].speeds[7] + cells[ii].speeds[8])) /
+          local_density;
+
+      /* velocity squared */
+      float u_sq = u_x * u_x + u_y * u_y;
+
+      /* equilibrium densities */
+      float d_equ;
+      /* zero velocity density: weight w0 */
+
+      d_equ = w0 * local_density * (1.f - u_sq / (2.f * c_sq));
+
+      __m256 x = _mm256_setr_ps(u_x, u_y, -u_x, -u_y, u_x + u_y, -u_x + u_y,
+                                -u_x - u_y, u_x - u_y);
+
+      __m256 res = _mm256_add_ps(
+          _mm256_add_ps(_1, _mm256_div_ps(x, c)),
+          _mm256_sub_ps(_mm256_div_ps(_mm256_mul_ps(x, x),
+                                      _mm256_set1_ps(2.f * c_sq * c_sq)),
+                        _mm256_set1_ps(u_sq / (2.f * c_sq))));
+      res = _mm256_mul_ps(_mm256_mul_ps(res, _mm256_set1_ps(local_density)),
+                          _mm256_setr_ps(w1, w1, w1, w1, w2, w2, w2, w2));
+      /* relaxation step */
+      tmp_cells[ii].speeds[0] =
+          cells[ii].speeds[0] + params.omega * (d_equ - cells[ii].speeds[0]);
+      __m256 c_s = _mm256_loadu_ps(cells[ii].speeds + 1);
+      res = _mm256_add_ps(_mm256_mul_ps(_mm256_sub_ps(res, c_s), omega), c_s);
+      _mm256_storeu_ps(tmp_cells[ii].speeds + 1, res);
+    } else {
+      tmp_cells[ii].speeds[0] = cells[ii].speeds[0];
+      tmp_cells[ii].speeds[1] = cells[ii].speeds[3];
+      tmp_cells[ii].speeds[2] = cells[ii].speeds[4];
+      tmp_cells[ii].speeds[3] = cells[ii].speeds[1];
+      tmp_cells[ii].speeds[4] = cells[ii].speeds[2];
+      tmp_cells[ii].speeds[5] = cells[ii].speeds[7];
+      tmp_cells[ii].speeds[6] = cells[ii].speeds[8];
+      tmp_cells[ii].speeds[7] = cells[ii].speeds[5];
+      tmp_cells[ii].speeds[8] = cells[ii].speeds[6];
     }
   }
 }
