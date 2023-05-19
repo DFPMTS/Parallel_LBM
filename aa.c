@@ -8,18 +8,9 @@
 float top[4096][3];
 float down[4096][3];
 
-// int aa_even_1(const t_param params, t_speed *cells, t_speed *tmp_cells,
-//               int *obstacles, float *inlets);
-
-// int aa_even_2(const t_param params, t_speed *cells, t_speed *tmp_cells,
-//               int *obstacles, float *inlets);
-
 int aa_even_timestep(const t_param params, t_speed *cells, t_speed *tmp_cells,
                      float *inlets, int *obstacles) {
   aa_even(params, cells, tmp_cells, obstacles, inlets);
-  // aa_even_1(params, cells, tmp_cells, obstacles, inlets);
-  // aa_boundary(params, cells, tmp_cells, inlets);
-  // aa_even_2(params, cells, tmp_cells, obstacles, inlets);
   aa_boundary(params, cells, tmp_cells, inlets);
   return 0;
 }
