@@ -1,8 +1,8 @@
 # Makefile
 CC = gcc
-CFLAGS = -std=c99 -Wall -O3 -mavx
+CFLAGS = -std=c99 -Wall -Ofast -mavx
 LIBS = -lm -fopenmp
-SRC = main.c d2q9_bgk.c calc.c utils.c 
+SRC = main.c d2q9_bgk.c calc.c utils.c aa.c
 EXE=lbm
 
 PARAMS_DIR=./data/params
