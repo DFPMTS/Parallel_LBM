@@ -284,10 +284,10 @@ int AoS_aa_even(const t_param params, t_speed_aos *cells, t_speed *tmp_cells,
 #pragma omp for
     for (int i = 0; i < params.nx; i += 128)
       for (int j = 0; j < params.ny; j += 128)
-        for (int jj = j; jj < j + 64; jj++) {
+        for (int jj = j; jj < j + 128; jj++) {
           y_n = (jj + 1 == params.ny) ? 0 : (jj + 1);
           y_s = (jj == 0) ? (params.ny - 1) : (jj - 1);
-          for (int ii = i; ii < i + 64; ii++) {
+          for (int ii = i; ii < i + 128; ii++) {
             /* determine indices of axis-direction neighbours
             ** respecting periodic boundary conditions (wrap around) */
             x_e = (ii + 1 == params.nx) ? 0 : (ii + 1);
