@@ -236,8 +236,9 @@ int AoS_aa_odd(const t_param params, t_speed_aos *cells, t_speed *tmp_cells,
 
         res = _mm256_add_ps(_mm256_mul_ps(_mm256_sub_ps(res, c_s), omega), c_s);
         // _mm256_storeu_ps(buffer + 1, res);
-        _mm256_storeu_ps(cells[ii + jj * params.nx].speeds + 1,
-                         _mm256_permute_ps(res, 0b01001110));
+        // _mm256_storeu_ps(cells[ii + jj * params.nx].speeds + 1,
+        //                  _mm256_permute_ps(res, 0b01001110));
+        _mm256_storeu_ps(cells[ii + jj * params.nx].speeds + 1, res);
 
         // cells[ii + jj * params.nx].speeds[1] = buffer[3];
         // cells[ii + jj * params.nx].speeds[3] = buffer[1];
