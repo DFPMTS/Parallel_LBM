@@ -87,13 +87,13 @@ int initialise(const char *paramfile, const char *obstaclefile, t_param *params,
   }
 
   /* 'helper' grid, used as scratch space */
-  *tmp_cells_ptr = malloc(sizeof(t_speed));
-  for (int k = 0; k < 9; ++k) {
-    (*tmp_cells_ptr)->speeds[k] =
-        (float *)malloc(sizeof(float) * (params->ny * params->nx));
-    if ((*tmp_cells_ptr)->speeds[k] == NULL)
-      die("cannot allocate memory for cells", __LINE__, __FILE__);
-  }
+  // *tmp_cells_ptr = malloc(sizeof(t_speed));
+  // for (int k = 0; k < 9; ++k) {
+  //   (*tmp_cells_ptr)->speeds[k] =
+  //       (float *)malloc(sizeof(float) * (params->ny * params->nx));
+  //   if ((*tmp_cells_ptr)->speeds[k] == NULL)
+  //     die("cannot allocate memory for cells", __LINE__, __FILE__);
+  // }
   /* the map of obstacles */
   *obstacles_ptr = malloc(sizeof(int) * (params->ny * params->nx));
   if (*obstacles_ptr == NULL)
@@ -181,11 +181,11 @@ int finalise(const t_param *params, t_speed **cells_ptr,
   free(*cells_ptr);
   *cells_ptr = NULL;
 
-  for (int k = 0; k < 9; ++k) {
-    free((*tmp_cells_ptr)->speeds[k]);
-  }
-  free(*tmp_cells_ptr);
-  *tmp_cells_ptr = NULL;
+  // for (int k = 0; k < 9; ++k) {
+  //   free((*tmp_cells_ptr)->speeds[k]);
+  // }
+  // free(*tmp_cells_ptr);
+  // *tmp_cells_ptr = NULL;
 
   free(*obstacles_ptr);
   *obstacles_ptr = NULL;
