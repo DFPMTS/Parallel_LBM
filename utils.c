@@ -82,6 +82,7 @@ int initialise(const char *paramfile, const char *obstaclefile, t_param *params,
 
   if (params->nx == 1024) {
     *type = 1;
+  } else {
     params->maxIters = 0;
   }
 
