@@ -21,6 +21,9 @@ int aa_odd_timestep(const t_param params, t_speed *cells, t_speed *tmp_cells,
   return 0;
 }
 
+float buffer[9];
+float prev[9];
+
 int aa_odd(const t_param params, t_speed *cells, t_speed *tmp_cells,
            int *obstacles) {
   const float c_sq = 1.f / 3.f; /* square of speed of sound */
@@ -39,9 +42,172 @@ int aa_odd(const t_param params, t_speed *cells, t_speed *tmp_cells,
   __m256 w = _mm256_setr_ps(w1, w1, w1, w1, w2, w2, w2, w2);
   __m256 omega = _mm256_set1_ps(params.omega);
 
-#pragma omp parallel for
-  for (int jj = 0; jj < params.ny; jj++) {
-    float buffer[9];
+  // ! jj = 0  -----------------------------------
+
+  int jj = 0;
+#pragma omp parallel for private(buffer)
+  for (int ii = 0; ii < params.nx; ii++) {
+    if (!obstacles[ii + jj * params.nx]) {
+      /* compute local density total */
+      float local_density = 0.f;
+
+      for (int kk = 0; kk < NSPEEDS; kk++) {
+        local_density += cells->speeds[kk][ii + jj * params.nx];
+      }
+
+      /* compute x velocity component */
+      float u_x = (cells->speeds[1][ii + jj * params.nx] +
+                   cells->speeds[5][ii + jj * params.nx] +
+                   cells->speeds[8][ii + jj * params.nx] -
+                   (cells->speeds[3][ii + jj * params.nx] +
+                    cells->speeds[6][ii + jj * params.nx] +
+                    cells->speeds[7][ii + jj * params.nx])) /
+                  local_density;
+      /* compute y velocity component */
+      float u_y = (cells->speeds[2][ii + jj * params.nx] +
+                   cells->speeds[5][ii + jj * params.nx] +
+                   cells->speeds[6][ii + jj * params.nx] -
+                   (cells->speeds[4][ii + jj * params.nx] +
+                    cells->speeds[7][ii + jj * params.nx] +
+                    cells->speeds[8][ii + jj * params.nx])) /
+                  local_density;
+      __m256 c_s = _mm256_setr_ps(cells->speeds[1][ii + jj * params.nx],
+                                  cells->speeds[2][ii + jj * params.nx],
+                                  cells->speeds[3][ii + jj * params.nx],
+                                  cells->speeds[4][ii + jj * params.nx],
+                                  cells->speeds[5][ii + jj * params.nx],
+                                  cells->speeds[6][ii + jj * params.nx],
+                                  cells->speeds[7][ii + jj * params.nx],
+                                  cells->speeds[8][ii + jj * params.nx]);
+
+      /* velocity squared */
+      float u_sq = u_x * u_x + u_y * u_y;
+
+      /* equilibrium densities */
+      float d_equ;
+      /* zero velocity density: weight w0 */
+
+      d_equ = w0 * local_density * (1.f - u_sq / (2.f * c_sq));
+
+      __m256 x = _mm256_setr_ps(u_x, u_y, -u_x, -u_y, u_x + u_y, -u_x + u_y,
+                                -u_x - u_y, u_x - u_y);
+
+      __m256 res = _mm256_add_ps(
+          _mm256_add_ps(_1, _mm256_div_ps(x, c)),
+          _mm256_sub_ps(_mm256_div_ps(_mm256_mul_ps(x, x), _2_c_c),
+                        _mm256_set1_ps(u_sq / (2.f * c_sq))));
+      res = _mm256_mul_ps(_mm256_mul_ps(res, _mm256_set1_ps(local_density)), w);
+      /* relaxation step */
+      cells->speeds[0][ii + jj * params.nx] =
+          cells->speeds[0][ii + jj * params.nx] +
+          params.omega * (d_equ - cells->speeds[0][ii + jj * params.nx]);
+
+      res = _mm256_add_ps(_mm256_mul_ps(_mm256_sub_ps(res, c_s), omega), c_s);
+      _mm256_storeu_ps(buffer + 1, res);
+
+      cells->speeds[1][ii + jj * params.nx] = buffer[3];
+      cells->speeds[3][ii + jj * params.nx] = buffer[1];
+      cells->speeds[2][ii + jj * params.nx] = buffer[4];
+      cells->speeds[4][ii + jj * params.nx] = buffer[2];
+      cells->speeds[5][ii + jj * params.nx] = buffer[7];
+      cells->speeds[7][ii + jj * params.nx] = buffer[5];
+      cells->speeds[6][ii + jj * params.nx] = buffer[8];
+      cells->speeds[8][ii + jj * params.nx] = buffer[6];
+
+      down[ii][0] = buffer[4];
+      down[ii][1] = buffer[7];
+      down[ii][2] = buffer[8];
+    } else {
+      down[ii][0] = cells->speeds[4][ii + jj * params.nx];
+      down[ii][1] = cells->speeds[7][ii + jj * params.nx];
+      down[ii][2] = cells->speeds[8][ii + jj * params.nx];
+    }
+  }
+
+  // ! jj = param.ny - 1 -----------------------------------
+
+  jj = params.ny - 1;
+#pragma omp parallel for private(buffer)
+  for (int ii = 0; ii < params.nx; ++ii) {
+    if (!obstacles[ii + jj * params.nx]) {
+      /* compute local density total */
+      float local_density = 0.f;
+
+      for (int kk = 0; kk < NSPEEDS; kk++) {
+        local_density += cells->speeds[kk][ii + jj * params.nx];
+      }
+
+      /* compute x velocity component */
+      float u_x = (cells->speeds[1][ii + jj * params.nx] +
+                   cells->speeds[5][ii + jj * params.nx] +
+                   cells->speeds[8][ii + jj * params.nx] -
+                   (cells->speeds[3][ii + jj * params.nx] +
+                    cells->speeds[6][ii + jj * params.nx] +
+                    cells->speeds[7][ii + jj * params.nx])) /
+                  local_density;
+      /* compute y velocity component */
+      float u_y = (cells->speeds[2][ii + jj * params.nx] +
+                   cells->speeds[5][ii + jj * params.nx] +
+                   cells->speeds[6][ii + jj * params.nx] -
+                   (cells->speeds[4][ii + jj * params.nx] +
+                    cells->speeds[7][ii + jj * params.nx] +
+                    cells->speeds[8][ii + jj * params.nx])) /
+                  local_density;
+      __m256 c_s = _mm256_setr_ps(cells->speeds[1][ii + jj * params.nx],
+                                  cells->speeds[2][ii + jj * params.nx],
+                                  cells->speeds[3][ii + jj * params.nx],
+                                  cells->speeds[4][ii + jj * params.nx],
+                                  cells->speeds[5][ii + jj * params.nx],
+                                  cells->speeds[6][ii + jj * params.nx],
+                                  cells->speeds[7][ii + jj * params.nx],
+                                  cells->speeds[8][ii + jj * params.nx]);
+
+      /* velocity squared */
+      float u_sq = u_x * u_x + u_y * u_y;
+
+      /* equilibrium densities */
+      float d_equ;
+      /* zero velocity density: weight w0 */
+
+      d_equ = w0 * local_density * (1.f - u_sq / (2.f * c_sq));
+
+      __m256 x = _mm256_setr_ps(u_x, u_y, -u_x, -u_y, u_x + u_y, -u_x + u_y,
+                                -u_x - u_y, u_x - u_y);
+
+      __m256 res = _mm256_add_ps(
+          _mm256_add_ps(_1, _mm256_div_ps(x, c)),
+          _mm256_sub_ps(_mm256_div_ps(_mm256_mul_ps(x, x), _2_c_c),
+                        _mm256_set1_ps(u_sq / (2.f * c_sq))));
+      res = _mm256_mul_ps(_mm256_mul_ps(res, _mm256_set1_ps(local_density)), w);
+      /* relaxation step */
+      cells->speeds[0][ii + jj * params.nx] =
+          cells->speeds[0][ii + jj * params.nx] +
+          params.omega * (d_equ - cells->speeds[0][ii + jj * params.nx]);
+
+      res = _mm256_add_ps(_mm256_mul_ps(_mm256_sub_ps(res, c_s), omega), c_s);
+      _mm256_storeu_ps(buffer + 1, res);
+
+      cells->speeds[1][ii + jj * params.nx] = buffer[3];
+      cells->speeds[3][ii + jj * params.nx] = buffer[1];
+      cells->speeds[2][ii + jj * params.nx] = buffer[4];
+      cells->speeds[4][ii + jj * params.nx] = buffer[2];
+      cells->speeds[5][ii + jj * params.nx] = buffer[7];
+      cells->speeds[7][ii + jj * params.nx] = buffer[5];
+      cells->speeds[6][ii + jj * params.nx] = buffer[8];
+      cells->speeds[8][ii + jj * params.nx] = buffer[6];
+
+      top[ii][0] = buffer[2];
+      top[ii][1] = buffer[5];
+      top[ii][2] = buffer[6];
+    } else {
+      top[ii][0] = cells->speeds[2][ii + jj * params.nx];
+      top[ii][1] = cells->speeds[5][ii + jj * params.nx];
+      top[ii][2] = cells->speeds[6][ii + jj * params.nx];
+    }
+  }
+
+#pragma omp parallel for private(buffer)
+  for (int jj = 1; jj < params.ny - 1; jj++) {
     for (int ii = 0; ii < params.nx; ii++) {
       if (!obstacles[ii + jj * params.nx]) {
         /* compute local density total */
@@ -67,6 +233,14 @@ int aa_odd(const t_param params, t_speed *cells, t_speed *tmp_cells,
                       cells->speeds[7][ii + jj * params.nx] +
                       cells->speeds[8][ii + jj * params.nx])) /
                     local_density;
+        __m256 c_s = _mm256_setr_ps(cells->speeds[1][ii + jj * params.nx],
+                                    cells->speeds[2][ii + jj * params.nx],
+                                    cells->speeds[3][ii + jj * params.nx],
+                                    cells->speeds[4][ii + jj * params.nx],
+                                    cells->speeds[5][ii + jj * params.nx],
+                                    cells->speeds[6][ii + jj * params.nx],
+                                    cells->speeds[7][ii + jj * params.nx],
+                                    cells->speeds[8][ii + jj * params.nx]);
 
         /* velocity squared */
         float u_sq = u_x * u_x + u_y * u_y;
@@ -90,14 +264,6 @@ int aa_odd(const t_param params, t_speed *cells, t_speed *tmp_cells,
         cells->speeds[0][ii + jj * params.nx] =
             cells->speeds[0][ii + jj * params.nx] +
             params.omega * (d_equ - cells->speeds[0][ii + jj * params.nx]);
-        __m256 c_s = _mm256_setr_ps(cells->speeds[1][ii + jj * params.nx],
-                                    cells->speeds[2][ii + jj * params.nx],
-                                    cells->speeds[3][ii + jj * params.nx],
-                                    cells->speeds[4][ii + jj * params.nx],
-                                    cells->speeds[5][ii + jj * params.nx],
-                                    cells->speeds[6][ii + jj * params.nx],
-                                    cells->speeds[7][ii + jj * params.nx],
-                                    cells->speeds[8][ii + jj * params.nx]);
 
         res = _mm256_add_ps(_mm256_mul_ps(_mm256_sub_ps(res, c_s), omega), c_s);
         _mm256_storeu_ps(buffer + 1, res);
@@ -110,33 +276,11 @@ int aa_odd(const t_param params, t_speed *cells, t_speed *tmp_cells,
         cells->speeds[7][ii + jj * params.nx] = buffer[5];
         cells->speeds[6][ii + jj * params.nx] = buffer[8];
         cells->speeds[8][ii + jj * params.nx] = buffer[6];
-        if (jj == 0) {
-          down[ii][0] = buffer[4];
-          down[ii][1] = buffer[7];
-          down[ii][2] = buffer[8];
-        } else if (jj == params.ny - 1) {
-          top[ii][0] = buffer[2];
-          top[ii][1] = buffer[5];
-          top[ii][2] = buffer[6];
-        }
-      } else {
-        if (jj == 0) {
-          down[ii][0] = cells->speeds[4][ii + jj * params.nx];
-          down[ii][1] = cells->speeds[7][ii + jj * params.nx];
-          down[ii][2] = cells->speeds[8][ii + jj * params.nx];
-        } else if (jj == params.ny - 1) {
-          top[ii][0] = cells->speeds[2][ii + jj * params.nx];
-          top[ii][1] = cells->speeds[5][ii + jj * params.nx];
-          top[ii][2] = cells->speeds[6][ii + jj * params.nx];
-        }
       }
     }
   }
   return EXIT_SUCCESS;
 }
-
-float buffer[9];
-float prev[9];
 
 int aa_even(const t_param params, t_speed *cells, t_speed *tmp_cells,
             int *obstacles, float *inlets) {
