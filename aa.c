@@ -21,8 +21,8 @@ int aa_odd_timestep(const t_param params, t_speed *cells, t_speed *tmp_cells,
   return 0;
 }
 
-float buffer[9];
-float prev[9];
+static float buffer[9];
+static float prev[9];
 
 int aa_odd(const t_param params, t_speed *cells, t_speed *tmp_cells,
            int *obstacles) {

@@ -2,7 +2,7 @@
 CC = gcc
 CFLAGS = -std=c99 -Wall -Ofast -mavx
 LIBS = -lm -fopenmp
-SRC = main.c d2q9_bgk.c calc.c utils.c aa.c
+SRC = main.c d2q9_bgk.c calc.c utils.c aa.c aa_AoS.c
 EXE=lbm
 
 PARAMS_DIR=./data/params

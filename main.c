@@ -5,6 +5,7 @@
 */
 
 #include "aa.h"
+#include "aa_AoS.h"
 #include "calc.h"
 #include "d2q9_bgk.h"
 #include "types.h"
@@ -59,8 +60,14 @@ int main(int argc, char *argv[]) {
   total_time = timstr.tv_sec + (timstr.tv_usec / 1000000.0);
   init_time = total_time;
   /* initialise our data structures and load values from file */
+
+  // ! cells_aos_ptr
+  t_speed_aos *cells_aos;
+  // ! type 0 for SoA 1 for AoS
+  int type = 0;
   initialise(paramfile, obstaclefile, &params, &cells, &tmp_cells, &obstacles,
-             &inlets);
+             &inlets, &cells_aos, &type);
+
   /* Set the inlet speed */
   set_inlets(params, inlets);
   /* Init time stops here */
@@ -85,15 +92,19 @@ int main(int argc, char *argv[]) {
   /* timestep loop */
   for (int tt = 0; tt < params.maxIters; tt += 2) {
     // timestep(params, cells, tmp_cells, inlets, obstacles);
+    if (type == 0) {
+      aa_odd_timestep(params, cells, tmp_cells, inlets, obstacles);
+      aa_even_timestep(params, cells, tmp_cells, inlets, obstacles);
+    } else if (type == 1) {
+      AoS_aa_odd_timestep(params, cells_aos, tmp_cells, inlets, obstacles);
+      AoS_aa_even_timestep(params, cells_aos, tmp_cells, inlets, obstacles);
+    }
 
-    aa_odd_timestep(params, cells, tmp_cells, inlets, obstacles);
-    aa_even_timestep(params, cells, tmp_cells, inlets, obstacles);
-
-    /* Visualization */
+/* Visualization */
 #ifdef VISUAL
     if (tt % 1000 == 0) {
       sprintf(buf, "%s/visual/state_%d.dat", out_dir, tt / 1000);
-      write_state(buf, params, cells, obstacles);
+      write_state(buf, params, cells, obstacles, cells_aos, type);
     }
 #endif
   }
@@ -104,20 +115,19 @@ int main(int argc, char *argv[]) {
 
   /* write final state and free memory */
   sprintf(buf, "%s/final_state.dat", out_dir);
-  write_state(buf, params, cells, obstacles);
+  write_state(buf, params, cells, obstacles, cells_aos, type);
 
   /* Display Reynolds number and time */
   printf("==done==\n");
   printf("Reynolds number:\t\t\t%.12E\n",
-         calc_reynolds(params, cells, obstacles));
+         calc_reynolds(params, cells, obstacles, cells_aos, type));
   printf("Average velocity:\t\t\t%.12E\n",
-         av_velocity(params, cells, obstacles));
+         av_velocity(params, cells, obstacles, cells_aos, type));
   printf("Elapsed Init time:\t\t\t%.6lf (s)\n", init_time);
   printf("Elapsed Compute time:\t\t\t%.6lf (s)\n", comp_time);
 
   /* finalise */
-  finalise(&params, &cells, &tmp_cells, &obstacles, &inlets);
-
+  finalise(&params, &cells, &tmp_cells, &obstacles, &inlets, &cells_aos, type);
   /* total time stop */
   gettimeofday(&timstr, NULL);
   total_time = timstr.tv_sec + (timstr.tv_usec / 1000000.0) - total_time;

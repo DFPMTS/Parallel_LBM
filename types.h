@@ -27,4 +27,8 @@ typedef struct {
   float *speeds[NSPEEDS];
 } t_speed;
 
+typedef struct {
+  float speeds[NSPEEDS];
+} t_speed_aos;
+
 #endif

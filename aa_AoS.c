@@ -95,20 +95,21 @@ int AoS_aa_odd(const t_param params, t_speed_aos *cells, t_speed *tmp_cells,
           params.omega * (d_equ - cells[ii + jj * params.nx].speeds[0]);
 
       res = _mm256_add_ps(_mm256_mul_ps(_mm256_sub_ps(res, c_s), omega), c_s);
-      _mm256_storeu_ps(buffer + 1, res);
+      _mm256_storeu_ps(cells[ii + jj * params.nx].speeds + 1,
+                       _mm256_permute_ps(res, 0b01001110));
 
-      cells[ii + jj * params.nx].speeds[1] = buffer[3];
-      cells[ii + jj * params.nx].speeds[3] = buffer[1];
-      cells[ii + jj * params.nx].speeds[2] = buffer[4];
-      cells[ii + jj * params.nx].speeds[4] = buffer[2];
-      cells[ii + jj * params.nx].speeds[5] = buffer[7];
-      cells[ii + jj * params.nx].speeds[7] = buffer[5];
-      cells[ii + jj * params.nx].speeds[6] = buffer[8];
-      cells[ii + jj * params.nx].speeds[8] = buffer[6];
+      // cells[ii + jj * params.nx].speeds[1] = buffer[3];
+      // cells[ii + jj * params.nx].speeds[3] = buffer[1];
+      // cells[ii + jj * params.nx].speeds[2] = buffer[4];
+      // cells[ii + jj * params.nx].speeds[4] = buffer[2];
+      // cells[ii + jj * params.nx].speeds[5] = buffer[7];
+      // cells[ii + jj * params.nx].speeds[7] = buffer[5];
+      // cells[ii + jj * params.nx].speeds[6] = buffer[8];
+      // cells[ii + jj * params.nx].speeds[8] = buffer[6];
     }
-    down[ii][0] = cells[ii + jj * params.nx].speeds[4];
-    down[ii][1] = cells[ii + jj * params.nx].speeds[7];
-    down[ii][2] = cells[ii + jj * params.nx].speeds[8];
+    down[ii][0] = cells[ii + jj * params.nx].speeds[2];
+    down[ii][1] = cells[ii + jj * params.nx].speeds[5];
+    down[ii][2] = cells[ii + jj * params.nx].speeds[6];
   }
 
   // ! jj = param.ny - 1 -----------------------------------
@@ -164,20 +165,22 @@ int AoS_aa_odd(const t_param params, t_speed_aos *cells, t_speed *tmp_cells,
           params.omega * (d_equ - cells[ii + jj * params.nx].speeds[0]);
 
       res = _mm256_add_ps(_mm256_mul_ps(_mm256_sub_ps(res, c_s), omega), c_s);
-      _mm256_storeu_ps(buffer + 1, res);
+      // _mm256_storeu_ps(buffer + 1, res);
+      _mm256_storeu_ps(cells[ii + jj * params.nx].speeds + 1,
+                       _mm256_permute_ps(res, 0b01001110));
 
-      cells[ii + jj * params.nx].speeds[1] = buffer[3];
-      cells[ii + jj * params.nx].speeds[3] = buffer[1];
-      cells[ii + jj * params.nx].speeds[2] = buffer[4];
-      cells[ii + jj * params.nx].speeds[4] = buffer[2];
-      cells[ii + jj * params.nx].speeds[5] = buffer[7];
-      cells[ii + jj * params.nx].speeds[7] = buffer[5];
-      cells[ii + jj * params.nx].speeds[6] = buffer[8];
-      cells[ii + jj * params.nx].speeds[8] = buffer[6];
+      // cells[ii + jj * params.nx].speeds[1] = buffer[3];
+      // cells[ii + jj * params.nx].speeds[3] = buffer[1];
+      // cells[ii + jj * params.nx].speeds[2] = buffer[4];
+      // cells[ii + jj * params.nx].speeds[4] = buffer[2];
+      // cells[ii + jj * params.nx].speeds[5] = buffer[7];
+      // cells[ii + jj * params.nx].speeds[7] = buffer[5];
+      // cells[ii + jj * params.nx].speeds[6] = buffer[8];
+      // cells[ii + jj * params.nx].speeds[8] = buffer[6];
     }
-    top[ii][0] = cells[ii + jj * params.nx].speeds[2];
-    top[ii][1] = cells[ii + jj * params.nx].speeds[5];
-    top[ii][2] = cells[ii + jj * params.nx].speeds[6];
+    top[ii][0] = cells[ii + jj * params.nx].speeds[4];
+    top[ii][1] = cells[ii + jj * params.nx].speeds[7];
+    top[ii][2] = cells[ii + jj * params.nx].speeds[8];
   }
 
 #pragma omp parallel for private(buffer)
@@ -232,16 +235,18 @@ int AoS_aa_odd(const t_param params, t_speed_aos *cells, t_speed *tmp_cells,
             params.omega * (d_equ - cells[ii + jj * params.nx].speeds[0]);
 
         res = _mm256_add_ps(_mm256_mul_ps(_mm256_sub_ps(res, c_s), omega), c_s);
-        _mm256_storeu_ps(buffer + 1, res);
+        // _mm256_storeu_ps(buffer + 1, res);
+        _mm256_storeu_ps(cells[ii + jj * params.nx].speeds + 1,
+                         _mm256_permute_ps(res, 0b01001110));
 
-        cells[ii + jj * params.nx].speeds[1] = buffer[3];
-        cells[ii + jj * params.nx].speeds[3] = buffer[1];
-        cells[ii + jj * params.nx].speeds[2] = buffer[4];
-        cells[ii + jj * params.nx].speeds[4] = buffer[2];
-        cells[ii + jj * params.nx].speeds[5] = buffer[7];
-        cells[ii + jj * params.nx].speeds[7] = buffer[5];
-        cells[ii + jj * params.nx].speeds[6] = buffer[8];
-        cells[ii + jj * params.nx].speeds[8] = buffer[6];
+        // cells[ii + jj * params.nx].speeds[1] = buffer[3];
+        // cells[ii + jj * params.nx].speeds[3] = buffer[1];
+        // cells[ii + jj * params.nx].speeds[2] = buffer[4];
+        // cells[ii + jj * params.nx].speeds[4] = buffer[2];
+        // cells[ii + jj * params.nx].speeds[5] = buffer[7];
+        // cells[ii + jj * params.nx].speeds[7] = buffer[5];
+        // cells[ii + jj * params.nx].speeds[6] = buffer[8];
+        // cells[ii + jj * params.nx].speeds[8] = buffer[6];
       }
     }
   }
