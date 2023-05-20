@@ -384,9 +384,7 @@ int AoS_aa_even(const t_param params, t_speed_aos *cells, t_speed *tmp_cells,
                 _mm256_mul_ps(res, _mm256_set1_ps(local_density)), w);
             /* relaxation step */
             buffer[0] = buffer[0] + params.omega * (d_equ - buffer[0]);
-            __m256 c_s =
-                _mm256_setr_ps(buffer[1], buffer[2], buffer[3], buffer[4],
-                               buffer[5], buffer[6], buffer[7], buffer[8]);
+            __m256 c_s = _mm256_loadu_ps(buffer);
 
             res = _mm256_add_ps(_mm256_mul_ps(_mm256_sub_ps(res, c_s), omega),
                                 c_s);
