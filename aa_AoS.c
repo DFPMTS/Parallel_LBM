@@ -282,8 +282,8 @@ int AoS_aa_even(const t_param params, t_speed_aos *cells, t_speed *tmp_cells,
     int y_n, y_s, x_e, x_w;
     float local_density;
 #pragma omp for
-    for (int i = 0; i < params.nx; i += 64)
-      for (int j = 0; j < params.ny; j += 64)
+    for (int i = 0; i < params.nx; i += 128)
+      for (int j = 0; j < params.ny; j += 128)
         for (int jj = j; jj < j + 64; jj++) {
           y_n = (jj + 1 == params.ny) ? 0 : (jj + 1);
           y_s = (jj == 0) ? (params.ny - 1) : (jj - 1);
