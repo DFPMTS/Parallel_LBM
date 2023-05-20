@@ -80,9 +80,7 @@ int initialise(const char *paramfile, const char *obstaclefile, t_param *params,
 
   /* Allocate memory. */
 
-  if (params->nx == 1024) {
-    *type = 1;
-  }
+  *type = 1;
 
   // ! SoA
   if (*type == 0) {
